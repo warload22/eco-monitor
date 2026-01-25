@@ -1,170 +1,215 @@
 """
-Reports blueprint - data analysis and visualization
+Блюпринт для формирования аналитических отчетов
+Предоставляет API-эндпоинты и страницу для работы с отчетами
 """
-from flask import Blueprint, render_template, jsonify, request, current_app
-from database import execute_query
-from datetime import datetime, timedelta
+from flask import Blueprint, jsonify, request, render_template, current_app
+from pydantic import ValidationError, BaseModel, Field
+from typing import Optional
+from datetime import datetime
+from utils.measurements_logic import (
+    получить_статистику_по_параметру,
+    получить_сырые_данные_для_отчета,
+    получить_все_параметры
+)
 
 bp = Blueprint('reports', __name__)
+
+
+class ПараметрыОтчета(BaseModel):
+    """Схема валидации параметров для формирования отчета"""
+    parameter_id: int = Field(..., gt=0, description="ID параметра")
+    date_from: Optional[datetime] = Field(None, description="Начальная дата периода")
+    date_to: Optional[datetime] = Field(None, description="Конечная дата периода")
+    
+    @classmethod
+    def проверить_диапазон_дат(cls, date_from: Optional[datetime], date_to: Optional[datetime]):
+        """Проверка корректности диапазона дат"""
+        if date_from and date_to and date_to < date_from:
+            raise ValueError('Конечная дата должна быть позже начальной')
 
 
 @bp.route('/')
 def index():
     """
-    Render reports page
+    Отобразить страницу формирования отчетов
     
     Returns:
-        Rendered HTML template
+        HTML-страница с формой и контейнерами для отчета
     """
     return render_template('report.html')
 
 
-@bp.route('/statistics', methods=['GET'])
-def get_statistics():
+@bp.route('/api/summary', methods=['GET'])
+def получить_сводную_статистику():
     """
-    Get aggregated statistics for measurements
+    Получить агрегированную статистику по параметру за период
     
-    Query parameters:
-        parameter_id: Filter by parameter (optional)
-        days: Number of days to analyze (default 7)
+    Query параметры:
+        parameter_id: ID параметра (обязательный)
+        date_from: Начальная дата в ISO формате (опционально)
+        date_to: Конечная дата в ISO формате (опционально)
     
     Returns:
-        JSON with statistics (avg, min, max, count)
+        JSON с агрегированной статистикой:
+        {
+            "parameter": "PM2.5",
+            "unit": "мкг/м³",
+            "safe_limit": 35.0,
+            "period": {
+                "date_from": "2026-01-01T00:00:00",
+                "date_to": "2026-01-26T00:00:00"
+            },
+            "stats": {
+                "count": 150,
+                "avg": 15.2,
+                "max": 42.1,
+                "min": 5.5,
+                "std_dev": 8.3
+            }
+        }
     """
-    parameter_id = request.args.get('parameter_id', type=int)
-    days = request.args.get('days', default=7, type=int)
+    # Получаем параметры запроса
+    parameter_id_str = request.args.get('parameter_id')
+    date_from_str = request.args.get('date_from')
+    date_to_str = request.args.get('date_to')
     
-    if days < 1 or days > 365:
-        return jsonify({'error': 'Days must be between 1 and 365'}), 400
-    
-    start_date = datetime.utcnow() - timedelta(days=days)
-    
-    query = """
-        SELECT 
-            p.id as parameter_id,
-            p.name as parameter_name,
-            p.unit,
-            COUNT(m.id) as measurement_count,
-            AVG(m.value) as avg_value,
-            MIN(m.value) as min_value,
-            MAX(m.value) as max_value,
-            p.safe_limit
-        FROM measurements m
-        JOIN parameters p ON m.parameter_id = p.id
-        WHERE m.measured_at >= %s
-    """
-    params = [start_date]
-    
-    if parameter_id:
-        query += " AND p.id = %s"
-        params.append(parameter_id)
-    
-    query += """
-        GROUP BY p.id, p.name, p.unit, p.safe_limit
-        ORDER BY p.name
-    """
+    # Проверка обязательного параметра
+    if not parameter_id_str:
+        return jsonify({
+            'error': 'Отсутствует обязательный параметр parameter_id'
+        }), 400
     
     try:
-        results = execute_query(query, tuple(params))
+        # Преобразуем параметры
+        parameter_id = int(parameter_id_str)
+        date_from = datetime.fromisoformat(date_from_str) if date_from_str else None
+        date_to = datetime.fromisoformat(date_to_str) if date_to_str else None
         
-        # Format results
-        statistics = []
-        for row in results:
-            stat = {
-                'parameter_id': row['parameter_id'],
-                'parameter_name': row['parameter_name'],
-                'unit': row['unit'],
-                'count': row['measurement_count'],
-                'average': round(float(row['avg_value']), 2),
-                'minimum': round(float(row['min_value']), 2),
-                'maximum': round(float(row['max_value']), 2),
-                'safe_limit': float(row['safe_limit']) if row['safe_limit'] else None
-            }
-            
-            if stat['safe_limit']:
-                stat['exceeds_limit'] = stat['average'] > stat['safe_limit']
-            
-            statistics.append(stat)
+        # Валидируем через Pydantic
+        параметры = ПараметрыОтчета(
+            parameter_id=parameter_id,
+            date_from=date_from,
+            date_to=date_to
+        )
         
+        # Проверяем диапазон дат
+        ПараметрыОтчета.проверить_диапазон_дат(date_from, date_to)
+        
+    except ValueError as e:
         return jsonify({
-            'period_days': days,
-            'start_date': start_date.isoformat(),
-            'statistics': statistics
-        }), 200
+            'error': 'Некорректные параметры запроса',
+            'details': str(e)
+        }), 400
+    except ValidationError as e:
+        return jsonify({
+            'error': 'Некорректные параметры запроса',
+            'details': e.errors()
+        }), 400
+    
+    try:
+        # Получаем статистику через бизнес-логику
+        статистика = получить_статистику_по_параметру(
+            parameter_id=параметры.parameter_id,
+            date_from=параметры.date_from,
+            date_to=параметры.date_to
+        )
+        
+        if not статистика:
+            return jsonify({
+                'error': 'Нет данных для указанного параметра и периода'
+            }), 404
+        
+        return jsonify(статистика), 200
     
     except Exception as e:
-        current_app.logger.error(f"Error generating statistics: {e}")
-        return jsonify({'error': 'Failed to generate statistics'}), 500
+        current_app.logger.error(f"Ошибка при получении статистики: {e}")
+        return jsonify({
+            'error': 'Ошибка при формировании статистики'
+        }), 500
 
 
-@bp.route('/trends', methods=['GET'])
-def get_trends():
+@bp.route('/api/raw_data', methods=['GET'])
+def получить_сырые_данные():
     """
-    Get time-series data for trend analysis
+    Получить сырые данные измерений для таблицы и экспорта
     
-    Query parameters:
-        parameter_id: Required parameter ID
-        location_id: Optional location ID
-        days: Number of days (default 7)
+    Query параметры:
+        parameter_id: ID параметра (обязательный)
+        date_from: Начальная дата в ISO формате (опционально)
+        date_to: Конечная дата в ISO формате (опционально)
+        limit: Максимальное количество записей (по умолчанию 1000)
     
     Returns:
-        JSON with time-series data
-    """
-    parameter_id = request.args.get('parameter_id', type=int)
-    location_id = request.args.get('location_id', type=int)
-    days = request.args.get('days', default=7, type=int)
-    
-    if not parameter_id:
-        return jsonify({'error': 'parameter_id is required'}), 400
-    
-    if days < 1 or days > 365:
-        return jsonify({'error': 'Days must be between 1 and 365'}), 400
-    
-    start_date = datetime.utcnow() - timedelta(days=days)
-    
-    query = """
-        SELECT 
-            DATE_TRUNC('hour', m.measured_at) as time_bucket,
-            AVG(m.value) as avg_value,
-            MIN(m.value) as min_value,
-            MAX(m.value) as max_value,
-            COUNT(m.id) as count
-        FROM measurements m
-        WHERE m.parameter_id = %s
-            AND m.measured_at >= %s
-    """
-    params = [parameter_id, start_date]
-    
-    if location_id:
-        query += " AND m.location_id = %s"
-        params.append(location_id)
-    
-    query += """
-        GROUP BY time_bucket
-        ORDER BY time_bucket
-    """
-    
-    try:
-        results = execute_query(query, tuple(params))
-        
-        trends = [
+        JSON-массив с измерениями:
+        [
             {
-                'timestamp': row['time_bucket'].isoformat(),
-                'average': round(float(row['avg_value']), 2),
-                'minimum': round(float(row['min_value']), 2),
-                'maximum': round(float(row['max_value']), 2),
-                'count': row['count']
-            }
-            for row in results
+                "id": 1,
+                "measured_at": "2026-01-26T10:30:00",
+                "value": 15.2,
+                "location_name": "Станция Красногорск",
+                "latitude": 55.8215,
+                "longitude": 37.3297,
+                "district": "Красногорск",
+                "parameter_name": "PM2.5",
+                "unit": "мкг/м³",
+                "is_safe": true
+            },
+            ...
         ]
-        
+    """
+    # Получаем параметры запроса
+    parameter_id_str = request.args.get('parameter_id')
+    date_from_str = request.args.get('date_from')
+    date_to_str = request.args.get('date_to')
+    limit_str = request.args.get('limit', '1000')
+    
+    # Проверка обязательного параметра
+    if not parameter_id_str:
         return jsonify({
-            'parameter_id': parameter_id,
-            'location_id': location_id,
-            'period_days': days,
-            'trends': trends
-        }), 200
+            'error': 'Отсутствует обязательный параметр parameter_id'
+        }), 400
+    
+    try:
+        # Преобразуем параметры
+        parameter_id = int(parameter_id_str)
+        date_from = datetime.fromisoformat(date_from_str) if date_from_str else None
+        date_to = datetime.fromisoformat(date_to_str) if date_to_str else None
+        limit = min(int(limit_str), 10000)  # Ограничиваем максимум 10000 записей
+        
+        # Валидируем через Pydantic
+        параметры = ПараметрыОтчета(
+            parameter_id=parameter_id,
+            date_from=date_from,
+            date_to=date_to
+        )
+        
+        # Проверяем диапазон дат
+        ПараметрыОтчета.проверить_диапазон_дат(date_from, date_to)
+        
+    except ValueError as e:
+        return jsonify({
+            'error': 'Некорректные параметры запроса',
+            'details': str(e)
+        }), 400
+    except ValidationError as e:
+        return jsonify({
+            'error': 'Некорректные параметры запроса',
+            'details': e.errors()
+        }), 400
+    
+    try:
+        # Получаем сырые данные через бизнес-логику
+        данные = получить_сырые_данные_для_отчета(
+            parameter_id=параметры.parameter_id,
+            date_from=параметры.date_from,
+            date_to=параметры.date_to,
+            limit=limit
+        )
+        
+        return jsonify(данные), 200
     
     except Exception as e:
-        current_app.logger.error(f"Error generating trends: {e}")
-        return jsonify({'error': 'Failed to generate trends'}), 500
+        current_app.logger.error(f"Ошибка при получении сырых данных: {e}")
+        return jsonify({
+            'error': 'Ошибка при получении данных'
+        }), 500

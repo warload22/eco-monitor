@@ -225,6 +225,151 @@ def получить_все_параметры() -> List[Dict[str, Any]]:
     ]
 
 
+def получить_статистику_по_параметру(
+    parameter_id: int,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Получить агрегированную статистику по параметру за период
+    
+    Args:
+        parameter_id: ID параметра
+        date_from: Начальная дата периода
+        date_to: Конечная дата периода
+        
+    Returns:
+        Словарь со статистикой (avg, max, min, count) или None
+    """
+    запрос = """
+        SELECT 
+            p.name as parameter_name,
+            p.unit as parameter_unit,
+            p.safe_limit,
+            COUNT(m.id) as count,
+            AVG(m.value) as avg_value,
+            MAX(m.value) as max_value,
+            MIN(m.value) as min_value,
+            STDDEV(m.value) as std_dev
+        FROM measurements m
+        JOIN parameters p ON m.parameter_id = p.id
+        JOIN locations l ON m.location_id = l.id
+        WHERE m.parameter_id = %s
+        AND l.is_active = TRUE
+    """
+    
+    параметры = [parameter_id]
+    
+    if date_from:
+        запрос += " AND m.measured_at >= %s"
+        параметры.append(date_from)
+    
+    if date_to:
+        запрос += " AND m.measured_at <= %s"
+        параметры.append(date_to)
+    
+    запрос += " GROUP BY p.id, p.name, p.unit, p.safe_limit"
+    
+    результат = execute_query(запрос, tuple(параметры), fetch_one=True)
+    
+    if not результат or результат['count'] == 0:
+        return None
+    
+    return {
+        'parameter': результат['parameter_name'],
+        'unit': результат['parameter_unit'],
+        'safe_limit': float(результат['safe_limit']) if результат['safe_limit'] else None,
+        'period': {
+            'date_from': date_from.isoformat() if date_from else None,
+            'date_to': date_to.isoformat() if date_to else None
+        },
+        'stats': {
+            'count': результат['count'],
+            'avg': round(float(результат['avg_value']), 2),
+            'max': round(float(результат['max_value']), 2),
+            'min': round(float(результат['min_value']), 2),
+            'std_dev': round(float(результат['std_dev']), 2) if результат['std_dev'] else None
+        }
+    }
+
+
+def получить_сырые_данные_для_отчета(
+    parameter_id: int,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    limit: int = 1000
+) -> List[Dict[str, Any]]:
+    """
+    Получить сырые данные измерений для формирования отчета
+    
+    Args:
+        parameter_id: ID параметра
+        date_from: Начальная дата периода
+        date_to: Конечная дата периода
+        limit: Максимальное количество записей
+        
+    Returns:
+        Список словарей с данными измерений в табличном формате
+    """
+    запрос = """
+        SELECT 
+            m.id,
+            m.measured_at,
+            m.value,
+            l.name as location_name,
+            l.latitude,
+            l.longitude,
+            l.district,
+            p.name as parameter_name,
+            p.unit,
+            p.safe_limit
+        FROM measurements m
+        JOIN locations l ON m.location_id = l.id
+        JOIN parameters p ON m.parameter_id = p.id
+        WHERE m.parameter_id = %s
+        AND l.is_active = TRUE
+    """
+    
+    параметры = [parameter_id]
+    
+    if date_from:
+        запрос += " AND m.measured_at >= %s"
+        параметры.append(date_from)
+    
+    if date_to:
+        запрос += " AND m.measured_at <= %s"
+        параметры.append(date_to)
+    
+    запрос += " ORDER BY m.measured_at DESC LIMIT %s"
+    параметры.append(limit)
+    
+    результаты = execute_query(запрос, tuple(параметры))
+    
+    данные = []
+    for строка in результаты:
+        значение = float(строка['value'])
+        безопасно = (
+            значение <= float(строка['safe_limit'])
+            if строка['safe_limit'] is not None
+            else True
+        )
+        
+        данные.append({
+            'id': строка['id'],
+            'measured_at': строка['measured_at'].isoformat(),
+            'value': значение,
+            'location_name': строка['location_name'],
+            'latitude': float(строка['latitude']),
+            'longitude': float(строка['longitude']),
+            'district': строка.get('district'),
+            'parameter_name': строка['parameter_name'],
+            'unit': строка['unit'],
+            'is_safe': безопасно
+        })
+    
+    return данные
+
+
 def преобразовать_в_geojson(измерения: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Преобразовать список измерений в формат GeoJSON
