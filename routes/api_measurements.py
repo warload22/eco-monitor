@@ -1,205 +1,149 @@
 """
-API blueprint for measurements data
-Provides JSON endpoints for AJAX calls
+API-блюпринт для работы с данными измерений
+Предоставляет JSON-эндпоинты для взаимодействия с фронтендом
 """
 from flask import Blueprint, jsonify, request, current_app
 from pydantic import ValidationError
-from database import execute_query
-from schemas import MeasurementFilterSchema, MeasurementCreateSchema
+from schemas import (
+    MeasurementCreate,
+    MeasurementOut,
+    MeasurementFilterParams,
+    ParameterOut
+)
+from utils.measurements_logic import (
+    создать_измерение,
+    получить_измерения_с_фильтрами,
+    получить_все_параметры,
+    преобразовать_в_geojson
+)
 from typing import Dict, Any
 
 bp = Blueprint('api_measurements', __name__)
 
 
 @bp.route('/measurements', methods=['GET'])
-def get_measurements():
+def получить_измерения():
     """
-    Get measurements with optional filters
-    Returns GeoJSON format for OpenLayers
+    Получить измерения с опциональными фильтрами
+    Возвращает данные в формате GeoJSON для OpenLayers
     
-    Query parameters:
-        location_id: Filter by location
-        parameter_id: Filter by parameter
-        start_date: Filter by start date (ISO format)
-        end_date: Filter by end date (ISO format)
-        limit: Max results (default 100, max 1000)
-        offset: Pagination offset (default 0)
+    Параметры запроса:
+        parameter_id: Фильтр по ID параметра
+        date_from: Фильтр по начальной дате (ISO формат)
+        date_to: Фильтр по конечной дате (ISO формат)
+        limit: Максимум результатов (по умолчанию 100, макс 1000)
+        offset: Смещение для пагинации (по умолчанию 0)
     
     Returns:
-        JSON response with GeoJSON features
+        JSON-ответ с GeoJSON FeatureCollection
     """
+    # Защита от пустых параметров: если передан пустой параметр, игнорируем его
     try:
-        # Validate query parameters
-        filter_params = MeasurementFilterSchema(
-            location_id=request.args.get('location_id'),
-            parameter_id=request.args.get('parameter_id'),
-            start_date=request.args.get('start_date'),
-            end_date=request.args.get('end_date'),
+        параметры_фильтра = MeasurementFilterParams(
+            parameter_id=request.args.get('parameter_id') or None,
+            date_from=request.args.get('date_from') or None,
+            date_to=request.args.get('date_to') or None,
             limit=request.args.get('limit', 100),
             offset=request.args.get('offset', 0)
         )
     except ValidationError as e:
-        return jsonify({'error': 'Invalid parameters', 'details': e.errors()}), 400
-    
-    # Build query with filters
-    query = """
-        SELECT 
-            m.id,
-            m.value,
-            m.measured_at,
-            l.id as location_id,
-            l.name as location_name,
-            l.latitude,
-            l.longitude,
-            l.district,
-            p.id as parameter_id,
-            p.name as parameter_name,
-            p.unit,
-            p.safe_limit
-        FROM measurements m
-        JOIN locations l ON m.location_id = l.id
-        JOIN parameters p ON m.parameter_id = p.id
-        WHERE l.is_active = TRUE
-    """
-    params = []
-    
-    if filter_params.location_id:
-        query += " AND m.location_id = %s"
-        params.append(filter_params.location_id)
-    
-    if filter_params.parameter_id:
-        query += " AND m.parameter_id = %s"
-        params.append(filter_params.parameter_id)
-    
-    if filter_params.start_date:
-        query += " AND m.measured_at >= %s"
-        params.append(filter_params.start_date)
-    
-    if filter_params.end_date:
-        query += " AND m.measured_at <= %s"
-        params.append(filter_params.end_date)
-    
-    query += " ORDER BY m.measured_at DESC LIMIT %s OFFSET %s"
-    params.extend([filter_params.limit, filter_params.offset])
+        return jsonify({
+            'error': 'Некорректные параметры запроса',
+            'details': e.errors()
+        }), 400
     
     try:
-        results = execute_query(query, tuple(params))
+        # Получаем измерения из БД через бизнес-логику
+        измерения = получить_измерения_с_фильтрами(
+            parameter_id=параметры_фильтра.parameter_id,
+            date_from=параметры_фильтра.date_from,
+            date_to=параметры_фильтра.date_to,
+            limit=параметры_фильтра.limit,
+            offset=параметры_фильтра.offset
+        )
         
-        # Convert to GeoJSON format
-        features = []
-        for row in results:
-            is_safe = row['value'] <= row['safe_limit'] if row['safe_limit'] else True
-            
-            feature = {
-                'type': 'Feature',
-                'geometry': {
-                    'type': 'Point',
-                    'coordinates': [float(row['longitude']), float(row['latitude'])]
-                },
-                'properties': {
-                    'id': row['id'],
-                    'location_id': row['location_id'],
-                    'location_name': row['location_name'],
-                    'district': row['district'],
-                    'parameter_id': row['parameter_id'],
-                    'parameter_name': row['parameter_name'],
-                    'unit': row['unit'],
-                    'value': float(row['value']),
-                    'safe_limit': float(row['safe_limit']) if row['safe_limit'] else None,
-                    'is_safe': is_safe,
-                    'measured_at': row['measured_at'].isoformat()
-                }
-            }
-            features.append(feature)
-        
-        geojson = {
-            'type': 'FeatureCollection',
-            'features': features
-        }
+        # Преобразуем в GeoJSON
+        geojson = преобразовать_в_geojson(измерения)
         
         return jsonify(geojson), 200
     
     except Exception as e:
-        current_app.logger.error(f"Error fetching measurements: {e}")
-        return jsonify({'error': 'Database error'}), 500
+        current_app.logger.error(f"Ошибка при получении измерений: {e}")
+        return jsonify({'error': 'Ошибка базы данных'}), 500
 
 
 @bp.route('/measurements', methods=['POST'])
-def create_measurement():
+def создать_новое_измерение():
     """
-    Create new measurement record
+    Создать новую запись измерения
     
-    Request body:
-        JSON with location_id, parameter_id, value, measured_at (optional)
+    Тело запроса:
+        JSON с полями: parameter_id, value, latitude, longitude
+        Поле timestamp проставляется автоматически сервером
     
     Returns:
-        JSON response with created measurement ID
+        JSON-ответ с данными созданного измерения и статусом 201
     """
     if not request.is_json:
-        return jsonify({'error': 'Content-Type must be application/json'}), 400
+        return jsonify({'error': 'Content-Type должен быть application/json'}), 400
     
     try:
-        # Validate request data
-        measurement_data = MeasurementCreateSchema(**request.get_json())
+        # Валидируем данные запроса через Pydantic
+        данные_измерения = MeasurementCreate(**request.get_json())
     except ValidationError as e:
-        return jsonify({'error': 'Invalid data', 'details': e.errors()}), 400
-    
-    query = """
-        INSERT INTO measurements (location_id, parameter_id, value, measured_at)
-        VALUES (%s, %s, %s, %s)
-        RETURNING id
-    """
-    params = (
-        measurement_data.location_id,
-        measurement_data.parameter_id,
-        measurement_data.value,
-        measurement_data.measured_at
-    )
+        return jsonify({
+            'error': 'Некорректные данные',
+            'details': e.errors()
+        }), 400
     
     try:
-        result = execute_query(query, params, fetch_one=True)
+        # Создаем измерение через бизнес-логику
+        результат = создать_измерение(
+            parameter_id=данные_измерения.parameter_id,
+            value=данные_измерения.value,
+            latitude=данные_измерения.latitude,
+            longitude=данные_измерения.longitude
+        )
+        
         return jsonify({
             'success': True,
-            'id': result['id'],
-            'message': 'Measurement created successfully'
+            'data': результат,
+            'message': 'Измерение успешно создано'
         }), 201
     
     except Exception as e:
-        current_app.logger.error(f"Error creating measurement: {e}")
-        return jsonify({'error': 'Failed to create measurement'}), 500
+        current_app.logger.error(f"Ошибка при создании измерения: {e}")
+        return jsonify({'error': 'Не удалось создать измерение'}), 500
 
 
 @bp.route('/parameters', methods=['GET'])
-def get_parameters():
+def получить_параметры():
     """
-    Get all environmental parameters
+    Получить список всех параметров экологического мониторинга
+    Используется для заполнения выпадающего списка на фронтенде
     
     Returns:
-        JSON array of parameters
+        JSON-массив с параметрами (id, name, unit)
     """
-    query = """
-        SELECT id, name, unit, description, safe_limit
-        FROM parameters
-        ORDER BY name
-    """
-    
     try:
-        results = execute_query(query)
-        return jsonify(results or []), 200
+        параметры = получить_все_параметры()
+        return jsonify(параметры), 200
     except Exception as e:
-        current_app.logger.error(f"Error fetching parameters: {e}")
-        return jsonify({'error': 'Database error'}), 500
+        current_app.logger.error(f"Ошибка при получении параметров: {e}")
+        return jsonify({'error': 'Ошибка базы данных'}), 500
 
 
 @bp.route('/locations', methods=['GET'])
-def get_locations():
+def получить_локации():
     """
-    Get all active monitoring locations
+    Получить все активные точки мониторинга
     
     Returns:
-        JSON array of locations
+        JSON-массив с локациями
     """
-    query = """
+    from database import execute_query
+    
+    запрос = """
         SELECT id, name, latitude, longitude, address, district, is_active
         FROM locations
         WHERE is_active = TRUE
@@ -207,8 +151,8 @@ def get_locations():
     """
     
     try:
-        results = execute_query(query)
-        return jsonify(results or []), 200
+        результаты = execute_query(запрос)
+        return jsonify(результаты or []), 200
     except Exception as e:
-        current_app.logger.error(f"Error fetching locations: {e}")
-        return jsonify({'error': 'Database error'}), 500
+        current_app.logger.error(f"Ошибка при получении локаций: {e}")
+        return jsonify({'error': 'Ошибка базы данных'}), 500
