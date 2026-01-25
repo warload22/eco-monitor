@@ -18,6 +18,7 @@ bp = Blueprint('reports', __name__)
 class ПараметрыОтчета(BaseModel):
     """Схема валидации параметров для формирования отчета"""
     parameter_id: int = Field(..., gt=0, description="ID параметра")
+    location_id: Optional[int] = Field(None, gt=0, description="ID станции мониторинга")
     date_from: Optional[datetime] = Field(None, description="Начальная дата периода")
     date_to: Optional[datetime] = Field(None, description="Конечная дата периода")
     
@@ -46,6 +47,7 @@ def получить_сводную_статистику():
     
     Query параметры:
         parameter_id: ID параметра (обязательный)
+        location_id: ID станции мониторинга (опционально)
         date_from: Начальная дата в ISO формате (опционально)
         date_to: Конечная дата в ISO формате (опционально)
     
@@ -55,6 +57,7 @@ def получить_сводную_статистику():
             "parameter": "PM2.5",
             "unit": "мкг/м³",
             "safe_limit": 35.0,
+            "location_name": "Станция Центр",
             "period": {
                 "date_from": "2026-01-01T00:00:00",
                 "date_to": "2026-01-26T00:00:00"
@@ -70,6 +73,7 @@ def получить_сводную_статистику():
     """
     # Получаем параметры запроса
     parameter_id_str = request.args.get('parameter_id')
+    location_id_str = request.args.get('location_id')
     date_from_str = request.args.get('date_from')
     date_to_str = request.args.get('date_to')
     
@@ -82,12 +86,14 @@ def получить_сводную_статистику():
     try:
         # Преобразуем параметры
         parameter_id = int(parameter_id_str)
+        location_id = int(location_id_str) if location_id_str else None
         date_from = datetime.fromisoformat(date_from_str) if date_from_str else None
         date_to = datetime.fromisoformat(date_to_str) if date_to_str else None
         
         # Валидируем через Pydantic
         параметры = ПараметрыОтчета(
             parameter_id=parameter_id,
+            location_id=location_id,
             date_from=date_from,
             date_to=date_to
         )
@@ -110,6 +116,7 @@ def получить_сводную_статистику():
         # Получаем статистику через бизнес-логику
         статистика = получить_статистику_по_параметру(
             parameter_id=параметры.parameter_id,
+            location_id=параметры.location_id,
             date_from=параметры.date_from,
             date_to=параметры.date_to
         )
@@ -135,6 +142,7 @@ def получить_сырые_данные():
     
     Query параметры:
         parameter_id: ID параметра (обязательный)
+        location_id: ID станции мониторинга (опционально)
         date_from: Начальная дата в ISO формате (опционально)
         date_to: Конечная дата в ISO формате (опционально)
         limit: Максимальное количество записей (по умолчанию 1000)
@@ -159,6 +167,7 @@ def получить_сырые_данные():
     """
     # Получаем параметры запроса
     parameter_id_str = request.args.get('parameter_id')
+    location_id_str = request.args.get('location_id')
     date_from_str = request.args.get('date_from')
     date_to_str = request.args.get('date_to')
     limit_str = request.args.get('limit', '1000')
@@ -172,6 +181,7 @@ def получить_сырые_данные():
     try:
         # Преобразуем параметры
         parameter_id = int(parameter_id_str)
+        location_id = int(location_id_str) if location_id_str else None
         date_from = datetime.fromisoformat(date_from_str) if date_from_str else None
         date_to = datetime.fromisoformat(date_to_str) if date_to_str else None
         limit = min(int(limit_str), 10000)  # Ограничиваем максимум 10000 записей
@@ -179,6 +189,7 @@ def получить_сырые_данные():
         # Валидируем через Pydantic
         параметры = ПараметрыОтчета(
             parameter_id=parameter_id,
+            location_id=location_id,
             date_from=date_from,
             date_to=date_to
         )
@@ -201,6 +212,7 @@ def получить_сырые_данные():
         # Получаем сырые данные через бизнес-логику
         данные = получить_сырые_данные_для_отчета(
             parameter_id=параметры.parameter_id,
+            location_id=параметры.location_id,
             date_from=параметры.date_from,
             date_to=параметры.date_to,
             limit=limit

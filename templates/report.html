@@ -71,22 +71,30 @@
         <div class="card-body">
             <h5 class="card-title mb-3">Параметры отчета</h5>
             <form id="reportForm">
-                <div class="row g-3">
-                    <div class="col-md-4">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
                         <label for="parameterSelect" class="form-label">Параметр мониторинга *</label>
                         <select class="form-select" id="parameterSelect" required>
                             <option value="">Загрузка параметров...</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-6">
+                        <label for="locationSelect" class="form-label">Станция мониторинга</label>
+                        <select class="form-select" id="locationSelect">
+                            <option value="">Загрузка станций...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
                         <label for="dateFrom" class="form-label">Дата начала</label>
                         <input type="datetime-local" class="form-control" id="dateFrom">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label for="dateTo" class="form-label">Дата окончания</label>
                         <input type="datetime-local" class="form-control" id="dateTo">
                     </div>
-                    <div class="col-md-2 d-flex align-items-end">
+                    <div class="col-md-4 d-flex align-items-end">
                         <button type="submit" class="btn btn-success w-100">
                             <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
                             Сформировать

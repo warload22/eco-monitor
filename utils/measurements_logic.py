@@ -227,6 +227,7 @@ def получить_все_параметры() -> List[Dict[str, Any]]:
 
 def получить_статистику_по_параметру(
     parameter_id: int,
+    location_id: Optional[int] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None
 ) -> Optional[Dict[str, Any]]:
@@ -235,6 +236,7 @@ def получить_статистику_по_параметру(
     
     Args:
         parameter_id: ID параметра
+        location_id: ID станции мониторинга (опционально)
         date_from: Начальная дата периода
         date_to: Конечная дата периода
         
@@ -246,6 +248,7 @@ def получить_статистику_по_параметру(
             p.name as parameter_name,
             p.unit as parameter_unit,
             p.safe_limit,
+            l.name as location_name,
             COUNT(m.id) as count,
             AVG(m.value) as avg_value,
             MAX(m.value) as max_value,
@@ -260,6 +263,10 @@ def получить_статистику_по_параметру(
     
     параметры = [parameter_id]
     
+    if location_id:
+        запрос += " AND m.location_id = %s"
+        параметры.append(location_id)
+    
     if date_from:
         запрос += " AND m.measured_at >= %s"
         параметры.append(date_from)
@@ -268,7 +275,7 @@ def получить_статистику_по_параметру(
         запрос += " AND m.measured_at <= %s"
         параметры.append(date_to)
     
-    запрос += " GROUP BY p.id, p.name, p.unit, p.safe_limit"
+    запрос += " GROUP BY p.id, p.name, p.unit, p.safe_limit, l.name"
     
     результат = execute_query(запрос, tuple(параметры), fetch_one=True)
     
@@ -279,6 +286,7 @@ def получить_статистику_по_параметру(
         'parameter': результат['parameter_name'],
         'unit': результат['parameter_unit'],
         'safe_limit': float(результат['safe_limit']) if результат['safe_limit'] else None,
+        'location_name': результат['location_name'] if location_id else None,
         'period': {
             'date_from': date_from.isoformat() if date_from else None,
             'date_to': date_to.isoformat() if date_to else None
@@ -295,6 +303,7 @@ def получить_статистику_по_параметру(
 
 def получить_сырые_данные_для_отчета(
     parameter_id: int,
+    location_id: Optional[int] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     limit: int = 1000
@@ -304,6 +313,7 @@ def получить_сырые_данные_для_отчета(
     
     Args:
         parameter_id: ID параметра
+        location_id: ID станции мониторинга (опционально)
         date_from: Начальная дата периода
         date_to: Конечная дата периода
         limit: Максимальное количество записей
@@ -331,6 +341,10 @@ def получить_сырые_данные_для_отчета(
     """
     
     параметры = [parameter_id]
+    
+    if location_id:
+        запрос += " AND m.location_id = %s"
+        параметры.append(location_id)
     
     if date_from:
         запрос += " AND m.measured_at >= %s"

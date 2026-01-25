@@ -11,7 +11,10 @@ let текущийПараметр = {};
  * Инициализация при загрузке страницы
  */
 document.addEventListener('DOMContentLoaded', async () => {
-    await загрузитьПараметры();
+    await Promise.all([
+        загрузитьПараметры(),
+        загрузитьСтанции()
+    ]);
     настроитьОбработчики();
 });
 
@@ -50,6 +53,39 @@ async function загрузитьПараметры() {
 }
 
 /**
+ * Загрузить список станций мониторинга из API
+ */
+async function загрузитьСтанции() {
+    try {
+        const response = await fetch('/api/locations');
+        
+        if (!response.ok) {
+            throw new Error('Не удалось загрузить станции');
+        }
+        
+        const станции = await response.json();
+        const select = document.getElementById('locationSelect');
+        
+        // Очищаем селект
+        select.innerHTML = '<option value="">Все станции</option>';
+        
+        // Заполняем станциями
+        станции.forEach(location => {
+            const option = document.createElement('option');
+            option.value = location.id;
+            option.textContent = location.name;
+            option.dataset.name = location.name;
+            select.appendChild(option);
+        });
+        
+    } catch (error) {
+        console.error('Ошибка при загрузке станций:', error);
+        const select = document.getElementById('locationSelect');
+        select.innerHTML = '<option value="">Ошибка загрузки станций</option>';
+    }
+}
+
+/**
  * Настроить обработчики событий
  */
 function настроитьОбработчики() {
@@ -70,6 +106,7 @@ async function обработатьОтправкуФормы(event) {
     
     // Получаем значения из формы
     const parameterId = document.getElementById('parameterSelect').value;
+    const locationId = document.getElementById('locationSelect').value;
     const dateFrom = document.getElementById('dateFrom').value;
     const dateTo = document.getElementById('dateTo').value;
     
@@ -94,8 +131,8 @@ async function обработатьОтправкуФормы(event) {
     try {
         // Параллельные запросы к API
         const [статистика, сырыеДанные] = await Promise.all([
-            получитьСтатистику(parameterId, dateFrom, dateTo),
-            получитьСырыеДанные(parameterId, dateFrom, dateTo)
+            получитьСтатистику(parameterId, locationId, dateFrom, dateTo),
+            получитьСырыеДанные(parameterId, locationId, dateFrom, dateTo)
         ]);
         
         // Проверяем наличие данных
@@ -122,9 +159,10 @@ async function обработатьОтправкуФормы(event) {
 /**
  * Получить статистику с сервера
  */
-async function получитьСтатистику(parameterId, dateFrom, dateTo) {
+async function получитьСтатистику(parameterId, locationId, dateFrom, dateTo) {
     const params = new URLSearchParams({ parameter_id: parameterId });
     
+    if (locationId) params.append('location_id', locationId);
     if (dateFrom) params.append('date_from', dateFrom);
     if (dateTo) params.append('date_to', dateTo);
     
@@ -141,9 +179,10 @@ async function получитьСтатистику(parameterId, dateFrom, dateT
 /**
  * Получить сырые данные с сервера
  */
-async function получитьСырыеДанные(parameterId, dateFrom, dateTo) {
+async function получитьСырыеДанные(parameterId, locationId, dateFrom, dateTo) {
     const params = new URLSearchParams({ parameter_id: parameterId });
     
+    if (locationId) params.append('location_id', locationId);
     if (dateFrom) params.append('date_from', dateFrom);
     if (dateTo) params.append('date_to', dateTo);
     
@@ -169,7 +208,11 @@ function отобразитьСтатистику(статистика) {
     контейнер.style.display = 'block';
     
     // Заполняем заголовок
-    document.getElementById('parameterName').textContent = статистика.parameter;
+    let заголовок = статистика.parameter;
+    if (статистика.location_name) {
+        заголовок += ` - ${статистика.location_name}`;
+    }
+    document.getElementById('parameterName').textContent = заголовок;
     
     // Информация о периоде
     let периодТекст = 'За все время';
