@@ -1,9 +1,9 @@
 """
 Database connection and session management for EcoMonitor
-Uses psycopg2 for PostgreSQL connectivity
+Uses psycopg3 for PostgreSQL connectivity
 """
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 from flask import g, current_app
 from typing import Optional
 
@@ -14,19 +14,19 @@ def get_db():
     Creates new connection if not exists
     
     Returns:
-        psycopg2 connection object
+        psycopg connection object
     """
     if 'db' not in g:
         try:
-            g.db = psycopg2.connect(
+            g.db = psycopg.connect(
                 host=current_app.config['DB_HOST'],
                 port=current_app.config['DB_PORT'],
                 dbname=current_app.config['DB_NAME'],
                 user=current_app.config['DB_USER'],
                 password=current_app.config['DB_PASSWORD'],
-                cursor_factory=RealDictCursor
+                row_factory=dict_row
             )
-        except psycopg2.Error as e:
+        except psycopg.Error as e:
             current_app.logger.error(f"Database connection error: {e}")
             raise
     
@@ -61,7 +61,7 @@ def close_db(exception: Optional[Exception] = None) -> None:
                 db.commit()
             else:
                 db.rollback()
-        except psycopg2.Error as e:
+        except psycopg.Error as e:
             current_app.logger.error(f"Database error during cleanup: {e}")
         finally:
             db.close()
@@ -91,7 +91,7 @@ def execute_query(query: str, params: tuple = None, fetch_one: bool = False):
             return cursor.fetchall()
         
         return None  # INSERT/UPDATE/DELETE query
-    except psycopg2.Error as e:
+    except psycopg.Error as e:
         current_app.logger.error(f"Query execution error: {e}")
         raise
     finally:

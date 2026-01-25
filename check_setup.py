@@ -21,7 +21,7 @@ def check_dependencies():
     """Check if required packages are installed"""
     required_packages = [
         'flask',
-        'psycopg2',
+        'psycopg',
         'pydantic',
         'dotenv'
     ]
@@ -82,11 +82,11 @@ def check_env_file():
 def check_database_connection():
     """Check if database is accessible"""
     try:
-        import psycopg2
+        import psycopg
         from dotenv import load_dotenv
         load_dotenv()
         
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             host=os.getenv('DB_HOST'),
             port=os.getenv('DB_PORT', 5432),
             dbname=os.getenv('DB_NAME'),

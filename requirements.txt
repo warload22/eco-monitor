@@ -3,11 +3,11 @@ Flask==3.0.0
 Werkzeug==3.0.1
 
 # Database
-psycopg2-binary==2.9.9
+psycopg[binary]
 SQLAlchemy==2.0.23
 
 # Data validation
-pydantic==2.5.3
+pydantic>=2.5.3
 
 # Configuration
 python-dotenv==1.0.0
