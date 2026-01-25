@@ -12,6 +12,7 @@ let currentFilters = {
     location_id: '',
     hours: 24
 };
+let isLoading = false;
 
 /**
  * Initialize OpenLayers map
@@ -110,10 +111,43 @@ function initMap() {
 }
 
 /**
+ * Show loading indicator
+ */
+function showLoadingIndicator() {
+    isLoading = true;
+    const applyButton = document.getElementById('applyFilters');
+    if (applyButton) {
+        applyButton.disabled = true;
+        applyButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
+    }
+}
+
+/**
+ * Hide loading indicator
+ */
+function hideLoadingIndicator() {
+    isLoading = false;
+    const applyButton = document.getElementById('applyFilters');
+    if (applyButton) {
+        applyButton.disabled = false;
+        applyButton.innerHTML = 'Применить фильтры';
+    }
+}
+
+/**
  * Load measurements from API and display on map
  */
 async function loadMeasurements() {
+    // Prevent concurrent requests
+    if (isLoading) {
+        console.log('Request already in progress, skipping...');
+        return;
+    }
+    
     try {
+        // Show loading indicator
+        showLoadingIndicator();
+        
         // Build query parameters
         const params = new URLSearchParams();
         
@@ -134,8 +168,13 @@ async function loadMeasurements() {
         
         const geojson = await response.json();
         
-        // Clear existing markers
+        // ВАЖНО: Очистить все старые маркеры перед добавлением новых
         vectorSource.clear();
+        
+        // Закрыть popup, если открыт
+        if (popupOverlay) {
+            popupOverlay.setPosition(undefined);
+        }
         
         // Add markers for each feature
         if (geojson.features && geojson.features.length > 0) {
@@ -143,15 +182,24 @@ async function loadMeasurements() {
                 addMarkerToMap(feature);
             });
             
+            // Update station count
+            updateStationCount(geojson.features.length);
+            
             // Update last update time
             updateLastUpdateTime();
+            
+            console.log(`Loaded ${geojson.features.length} measurement(s)`);
         } else {
             console.log('No measurements found for current filters');
+            updateStationCount(0);
         }
         
     } catch (error) {
         console.error('Error loading measurements:', error);
         alert('Ошибка загрузки данных. Пожалуйста, попробуйте позже.');
+    } finally {
+        // Hide loading indicator
+        hideLoadingIndicator();
     }
 }
 
@@ -225,28 +273,72 @@ function getMarkerColor(value, safeLimit) {
  * @returns {string} - HTML content
  */
 function createPopupContent(props) {
+    // Определить статус
     const status = props.is_safe ? 
-        '<span class="badge bg-success">Норма</span>' : 
-        '<span class="badge bg-danger">Превышение</span>';
+        '<span class="badge bg-success">✓ Норма</span>' : 
+        '<span class="badge bg-danger">⚠ Превышение</span>';
     
+    // Форматировать дату и время
     const measuredDate = new Date(props.measured_at);
-    const formattedDate = measuredDate.toLocaleString('ru-RU');
+    const formattedDate = measuredDate.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    // Вычислить процент от нормы
+    let percentageInfo = '';
+    if (props.safe_limit && props.safe_limit > 0) {
+        const percentage = ((props.value / props.safe_limit) * 100).toFixed(1);
+        const percentageColor = props.is_safe ? '#28a745' : '#dc3545';
+        percentageInfo = `
+            <p class="mb-1">
+                <small>
+                    Процент от нормы: 
+                    <strong style="color: ${percentageColor};">${percentage}%</strong>
+                </small>
+            </p>
+        `;
+    }
     
     return `
-        <div style="min-width: 200px;">
-            <h6><strong>${props.location_name}</strong></h6>
-            ${props.district ? `<p class="mb-1"><small>📍 ${props.district}</small></p>` : ''}
+        <div style="min-width: 250px; max-width: 300px;">
+            <h6 class="mb-2"><strong>📍 ${props.location_name || 'Станция мониторинга'}</strong></h6>
+            ${props.district ? `<p class="mb-2 text-muted"><small>${props.district}</small></p>` : ''}
             <hr class="my-2">
-            <p class="mb-1">
-                <strong>${props.parameter_name}:</strong><br>
-                <span style="font-size: 1.2rem;">${props.value} ${props.unit}</span>
-            </p>
-            ${props.safe_limit ? `<p class="mb-1"><small>Норма: ${props.safe_limit} ${props.unit}</small></p>` : ''}
-            <p class="mb-1">${status}</p>
+            <div class="mb-2">
+                <strong>Тип загрязнителя:</strong> ${props.parameter_name}
+            </div>
+            <div class="mb-2">
+                <strong>Значение:</strong> 
+                <span style="font-size: 1.3rem; color: #0066cc;">${props.value} ${props.unit}</span>
+            </div>
+            ${props.safe_limit ? `
+                <div class="mb-1">
+                    <small>Норматив: <strong>${props.safe_limit} ${props.unit}</strong></small>
+                </div>
+            ` : ''}
+            ${percentageInfo}
+            <div class="mb-2">${status}</div>
             <hr class="my-2">
-            <p class="mb-0"><small>🕒 ${formattedDate}</small></p>
+            <div class="text-muted">
+                <small><strong>Время измерения:</strong><br>${formattedDate}</small>
+            </div>
         </div>
     `;
+}
+
+/**
+ * Update station count display
+ * @param {number} count - Number of stations
+ */
+function updateStationCount(count) {
+    const stationCountElement = document.getElementById('stationCount');
+    if (stationCountElement) {
+        stationCountElement.textContent = count;
+    }
 }
 
 /**
@@ -254,8 +346,18 @@ function createPopupContent(props) {
  */
 function updateLastUpdateTime() {
     const now = new Date();
-    const formatted = now.toLocaleString('ru-RU');
-    document.getElementById('lastUpdate').textContent = formatted;
+    const formatted = now.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    const lastUpdateElement = document.getElementById('lastUpdate');
+    if (lastUpdateElement) {
+        lastUpdateElement.textContent = formatted;
+    }
 }
 
 /**
