@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}О системе - EcoMonitor{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <h1 class="mb-4">О системе EcoMonitor</h1>
+            
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">🌿 Назначение</h5>
+                    <p class="card-text">
+                        EcoMonitor - это система мониторинга экологической ситуации в Московском регионе.
+                        Система собирает данные о качестве воздуха с различных мониторинговых станций
+                        и предоставляет их в удобном визуальном формате.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">📊 Отслеживаемые параметры</h5>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <strong>PM2.5</strong> - Твердые частицы размером 2.5 микрон
+                        </li>
+                        <li class="list-group-item">
+                            <strong>PM10</strong> - Твердые частицы размером 10 микрон
+                        </li>
+                        <li class="list-group-item">
+                            <strong>NO₂</strong> - Диоксид азота
+                        </li>
+                        <li class="list-group-item">
+                            <strong>SO₂</strong> - Диоксид серы
+                        </li>
+                        <li class="list-group-item">
+                            <strong>CO</strong> - Угарный газ
+                        </li>
+                        <li class="list-group-item">
+                            <strong>O₃</strong> - Озон
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">🔧 Технологии</h5>
+                    <p class="card-text">
+                        <strong>Backend:</strong> Python, Flask, PostgreSQL, psycopg2<br>
+                        <strong>Frontend:</strong> Bootstrap 5, Leaflet.js, Vanilla JavaScript<br>
+                        <strong>Валидация:</strong> Pydantic
+                    </p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">📧 Контакты</h5>
+                    <p class="card-text">
+                        По вопросам работы системы обращайтесь к администратору проекта.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

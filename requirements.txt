@@ -1,0 +1,19 @@
+# Flask and core dependencies
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# Database
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.23
+
+# Data validation
+pydantic==2.5.3
+
+# Configuration
+python-dotenv==1.0.0
+
+# Development dependencies (optional)
+# pytest==7.4.3
+# pytest-flask==1.3.0
+# black==23.12.1
+# flake8==7.0.0

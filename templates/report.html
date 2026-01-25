@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Отчеты и статистика - EcoMonitor{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stats-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #28a745;
+    }
+    .stat-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+    }
+    .chart-container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        min-height: 400px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">📊 Статистика и отчеты</h2>
+    
+    <!-- Filter Panel -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="stats-card">
+                <h5 class="mb-3">Параметры отчета</h5>
+                <div class="row">
+                    <div class="col-md-4">
+                        <label for="reportParameter" class="form-label">Параметр:</label>
+                        <select class="form-select" id="reportParameter">
+                            <option value="">Выберите параметр</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="reportPeriod" class="form-label">Период:</label>
+                        <select class="form-select" id="reportPeriod">
+                            <option value="7">Последние 7 дней</option>
+                            <option value="30" selected>Последние 30 дней</option>
+                            <option value="90">Последние 90 дней</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button class="btn btn-success w-100" id="generateReport">
+                            Сформировать отчет
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Statistics Cards -->
+    <div class="row" id="statsContainer">
+        <div class="col-md-3">
+            <div class="stats-card text-center">
+                <div class="stat-value" id="avgValue">-</div>
+                <div class="stat-label">Среднее значение</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card text-center">
+                <div class="stat-value" id="minValue">-</div>
+                <div class="stat-label">Минимум</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card text-center">
+                <div class="stat-value" id="maxValue">-</div>
+                <div class="stat-label">Максимум</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card text-center">
+                <div class="stat-value" id="measurementCount">-</div>
+                <div class="stat-label">Измерений</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="chart-container">
+                <h5 class="mb-3">График динамики</h5>
+                <canvas id="trendChart"></canvas>
+                <div id="chartPlaceholder" class="text-center text-muted py-5">
+                    <p>Выберите параметр и нажмите "Сформировать отчет" для отображения графика</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Data Table -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="stats-card">
+                <h5 class="mb-3">Детальная статистика по всем параметрам</h5>
+                <div class="table-responsive">
+                    <table class="table table-striped" id="statsTable">
+                        <thead>
+                            <tr>
+                                <th>Параметр</th>
+                                <th>Единица</th>
+                                <th>Среднее</th>
+                                <th>Минимум</th>
+                                <th>Максимум</th>
+                                <th>Норма</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">
+                                    Нажмите "Сформировать отчет" для загрузки данных
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    // Report generation logic will be added here
+    let trendChart = null;
+    
+    // Load parameters on page load
+    async function loadParameters() {
+        try {
+            const response = await fetch('/api/parameters');
+            const parameters = await response.json();
+            
+            const select = document.getElementById('reportParameter');
+            parameters.forEach(param => {
+                const option = document.createElement('option');
+                option.value = param.id;
+                option.textContent = `${param.name} (${param.unit})`;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading parameters:', error);
+        }
+    }
+    
+    // Generate report
+    async function generateReport() {
+        const parameterId = document.getElementById('reportParameter').value;
+        const days = document.getElementById('reportPeriod').value;
+        
+        if (!parameterId) {
+            alert('Пожалуйста, выберите параметр');
+            return;
+        }
+        
+        try {
+            // Load statistics
+            const statsResponse = await fetch(`/reports/statistics?parameter_id=${parameterId}&days=${days}`);
+            const statsData = await statsResponse.json();
+            
+            if (statsData.statistics && statsData.statistics.length > 0) {
+                const stat = statsData.statistics[0];
+                document.getElementById('avgValue').textContent = stat.average;
+                document.getElementById('minValue').textContent = stat.minimum;
+                document.getElementById('maxValue').textContent = stat.maximum;
+                document.getElementById('measurementCount').textContent = stat.count;
+            }
+            
+            // Load trends
+            const trendsResponse = await fetch(`/reports/trends?parameter_id=${parameterId}&days=${days}`);
+            const trendsData = await trendsResponse.json();
+            
+            // Update chart
+            updateChart(trendsData.trends);
+            
+            // Load all statistics for table
+            loadAllStatistics(days);
+            
+        } catch (error) {
+            console.error('Error generating report:', error);
+            alert('Ошибка при формировании отчета');
+        }
+    }
+    
+    function updateChart(trends) {
+        const canvas = document.getElementById('trendChart');
+        const placeholder = document.getElementById('chartPlaceholder');
+        
+        if (trends.length === 0) {
+            canvas.style.display = 'none';
+            placeholder.style.display = 'block';
+            return;
+        }
+        
+        canvas.style.display = 'block';
+        placeholder.style.display = 'none';
+        
+        const labels = trends.map(t => new Date(t.timestamp).toLocaleString('ru-RU'));
+        const data = trends.map(t => t.average);
+        
+        if (trendChart) {
+            trendChart.destroy();
+        }
+        
+        trendChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Среднее значение',
+                    data: data,
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                }
+            }
+        });
+    }
+    
+    async function loadAllStatistics(days) {
+        try {
+            const response = await fetch(`/reports/statistics?days=${days}`);
+            const data = await response.json();
+            
+            const tbody = document.getElementById('statsTableBody');
+            tbody.innerHTML = '';
+            
+            data.statistics.forEach(stat => {
+                const row = document.createElement('tr');
+                const status = stat.exceeds_limit ? 
+                    '<span class="badge bg-danger">Превышение</span>' : 
+                    '<span class="badge bg-success">Норма</span>';
+                
+                row.innerHTML = `
+                    <td>${stat.parameter_name}</td>
+                    <td>${stat.unit}</td>
+                    <td>${stat.average}</td>
+                    <td>${stat.minimum}</td>
+                    <td>${stat.maximum}</td>
+                    <td>${stat.safe_limit || '-'}</td>
+                    <td>${status}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        } catch (error) {
+            console.error('Error loading statistics:', error);
+        }
+    }
+    
+    document.getElementById('generateReport').addEventListener('click', generateReport);
+    
+    // Load parameters on page load
+    loadParameters();
+</script>
+{% endblock %}
