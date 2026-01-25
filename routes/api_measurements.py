@@ -29,6 +29,7 @@ def получить_измерения():
     
     Параметры запроса:
         parameter_id: Фильтр по ID параметра
+        location_id: Фильтр по ID локации (станции мониторинга)
         date_from: Фильтр по начальной дате (ISO формат)
         date_to: Фильтр по конечной дате (ISO формат)
         limit: Максимум результатов (по умолчанию 100, макс 1000)
@@ -41,6 +42,7 @@ def получить_измерения():
     try:
         параметры_фильтра = MeasurementFilterParams(
             parameter_id=request.args.get('parameter_id') or None,
+            location_id=request.args.get('location_id') or None,
             date_from=request.args.get('date_from') or None,
             date_to=request.args.get('date_to') or None,
             limit=request.args.get('limit', 100),
@@ -56,6 +58,7 @@ def получить_измерения():
         # Получаем измерения из БД через бизнес-логику
         измерения = получить_измерения_с_фильтрами(
             parameter_id=параметры_фильтра.parameter_id,
+            location_id=параметры_фильтра.location_id,
             date_from=параметры_фильтра.date_from,
             date_to=параметры_фильтра.date_to,
             limit=параметры_фильтра.limit,

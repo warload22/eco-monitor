@@ -58,6 +58,7 @@ class MeasurementOut(BaseModel):
 class MeasurementFilterParams(BaseModel):
     """Схема для параметров фильтрации измерений"""
     parameter_id: Optional[int] = Field(None, gt=0, description="ID параметра для фильтрации")
+    location_id: Optional[int] = Field(None, gt=0, description="ID локации для фильтрации")
     date_from: Optional[datetime] = Field(None, description="Начальная дата для фильтрации")
     date_to: Optional[datetime] = Field(None, description="Конечная дата для фильтрации")
     limit: int = Field(100, gt=0, le=1000, description="Максимальное количество результатов")

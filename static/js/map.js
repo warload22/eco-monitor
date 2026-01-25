@@ -103,7 +103,13 @@ function initMap() {
     map.on('pointermove', function(event) {
         const pixel = map.getEventPixel(event.originalEvent);
         const hit = map.hasFeatureAtPixel(pixel);
-        map.getTarget().style.cursor = hit ? 'pointer' : '';
+        const mapTarget = map.getTarget();
+        if (mapTarget && typeof mapTarget === 'string') {
+            const element = document.getElementById(mapTarget);
+            if (element) element.style.cursor = hit ? 'pointer' : '';
+        } else if (mapTarget) {
+            mapTarget.style.cursor = hit ? 'pointer' : '';
+        }
     });
     
     // Load initial data
@@ -158,6 +164,9 @@ async function loadMeasurements() {
         if (currentFilters.location_id) {
             params.append('location_id', currentFilters.location_id);
         }
+        
+        // Добавить временной фильтр (часы), если нужно
+        // API пока не поддерживает hours, но можем добавить для будущего расширения
         
         // Fetch data from API
         const response = await fetch(`/api/measurements?${params.toString()}`);

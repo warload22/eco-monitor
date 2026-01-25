@@ -95,20 +95,14 @@
                 <div class="mb-3">
                     <label for="parameterSelect" class="form-label">Параметр:</label>
                     <select class="form-select" id="parameterSelect">
-                        <option value="">Все параметры</option>
-                        {% for param in parameters %}
-                        <option value="{{ param.id }}">{{ param.name }} ({{ param.unit }})</option>
-                        {% endfor %}
+                        <option value="">Загрузка...</option>
                     </select>
                 </div>
                 
                 <div class="mb-3">
                     <label for="locationSelect" class="form-label">Станция:</label>
                     <select class="form-select" id="locationSelect">
-                        <option value="">Все станции</option>
-                        {% for loc in locations %}
-                        <option value="{{ loc.id }}">{{ loc.name }}</option>
-                        {% endfor %}
+                        <option value="">Загрузка...</option>
                     </select>
                 </div>
                 
@@ -161,7 +155,7 @@
             <div id="map"></div>
             <div class="mt-3 text-muted">
                 <small>
-                    <strong>Всего станций:</strong> <span id="stationCount">{{ locations|length }}</span> | 
+                    <strong>Показано точек:</strong> <span id="stationCount">0</span> | 
                     <strong>Последнее обновление:</strong> <span id="lastUpdate">-</span>
                 </small>
             </div>

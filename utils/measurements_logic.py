@@ -112,6 +112,7 @@ def создать_измерение(
 
 def получить_измерения_с_фильтрами(
     parameter_id: Optional[int] = None,
+    location_id: Optional[int] = None,
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     limit: int = 100,
@@ -122,6 +123,7 @@ def получить_измерения_с_фильтрами(
     
     Args:
         parameter_id: Фильтр по ID параметра
+        location_id: Фильтр по ID локации
         date_from: Фильтр по начальной дате
         date_to: Фильтр по конечной дате
         limit: Максимальное количество результатов
@@ -134,12 +136,14 @@ def получить_измерения_с_фильтрами(
         SELECT 
             m.id,
             m.parameter_id,
+            m.location_id,
             m.value,
             m.measured_at,
             m.created_at,
             l.latitude,
             l.longitude,
             l.name as location_name,
+            l.district,
             p.name as parameter_name,
             p.unit as parameter_unit,
             p.safe_limit
@@ -154,6 +158,10 @@ def получить_измерения_с_фильтрами(
     if parameter_id:
         запрос += " AND m.parameter_id = %s"
         параметры.append(parameter_id)
+    
+    if location_id:
+        запрос += " AND m.location_id = %s"
+        параметры.append(location_id)
     
     if date_from:
         запрос += " AND m.measured_at >= %s"
@@ -174,12 +182,14 @@ def получить_измерения_с_фильтрами(
         измерения.append({
             'id': строка['id'],
             'parameter_id': строка['parameter_id'],
+            'location_id': строка['location_id'],
             'parameter_name': строка['parameter_name'],
             'parameter_unit': строка['parameter_unit'],
             'value': float(строка['value']),
             'latitude': float(строка['latitude']),
             'longitude': float(строка['longitude']),
             'location_name': строка['location_name'],
+            'district': строка.get('district'),
             'measured_at': строка['measured_at'],
             'created_at': строка['created_at'],
             'safe_limit': float(строка['safe_limit']) if строка['safe_limit'] else None
@@ -243,10 +253,12 @@ def преобразовать_в_geojson(измерения: List[Dict[str, Any
             'properties': {
                 'id': изм['id'],
                 'parameter_id': изм['parameter_id'],
+                'location_id': изм['location_id'],
                 'parameter_name': изм['parameter_name'],
                 'unit': изм['parameter_unit'],
                 'value': изм['value'],
                 'location_name': изм['location_name'],
+                'district': изм.get('district'),
                 'safe_limit': изм['safe_limit'],
                 'is_safe': безопасно,
                 'measured_at': изм['measured_at'].isoformat(),
