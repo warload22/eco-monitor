@@ -15,7 +15,7 @@ bp = Blueprint('api_measurements', __name__)
 def get_measurements():
     """
     Get measurements with optional filters
-    Returns GeoJSON format for Leaflet
+    Returns GeoJSON format for OpenLayers
     
     Query parameters:
         location_id: Filter by location

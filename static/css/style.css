@@ -19,19 +19,59 @@ body {
     z-index: 1;
 }
 
-/* Custom marker styles */
-.custom-marker {
-    background: transparent;
-    border: none;
+/* OpenLayers popup customization */
+.ol-popup {
+    position: absolute;
+    background-color: white;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #cccccc;
+    bottom: 12px;
+    left: -50px;
+    min-width: 280px;
+    z-index: 1000;
 }
 
-/* Leaflet popup customization */
-.leaflet-popup-content-wrapper {
-    border-radius: 8px;
+.ol-popup:after, .ol-popup:before {
+    top: 100%;
+    border: solid transparent;
+    content: " ";
+    height: 0;
+    width: 0;
+    position: absolute;
+    pointer-events: none;
 }
 
-.leaflet-popup-content {
-    margin: 10px;
+.ol-popup:after {
+    border-top-color: white;
+    border-width: 10px;
+    left: 48px;
+    margin-left: -10px;
+}
+
+.ol-popup:before {
+    border-top-color: #cccccc;
+    border-width: 11px;
+    left: 48px;
+    margin-left: -11px;
+}
+
+.ol-popup-closer {
+    text-decoration: none;
+    position: absolute;
+    top: 2px;
+    right: 8px;
+    font-size: 24px;
+    color: #666;
+}
+
+.ol-popup-closer:hover {
+    color: #000;
+}
+
+.ol-popup-closer:after {
+    content: "✖";
 }
 
 /* Filter panel */

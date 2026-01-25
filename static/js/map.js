@@ -1,10 +1,12 @@
 /**
  * Map initialization and management for EcoMonitor
- * Uses Leaflet.js for interactive map visualization
+ * Uses OpenLayers for interactive map visualization
  */
 
 let map = null;
-let markersLayer = null;
+let vectorSource = null;
+let vectorLayer = null;
+let popupOverlay = null;
 let currentFilters = {
     parameter_id: '',
     location_id: '',
@@ -12,22 +14,96 @@ let currentFilters = {
 };
 
 /**
- * Initialize Leaflet map
+ * Initialize OpenLayers map
  */
 function initMap() {
-    // Center on Moscow
-    const moscowCenter = [55.7558, 37.6173];
+    // Create popup overlay element
+    const popupElement = document.createElement('div');
+    popupElement.id = 'popup';
+    popupElement.className = 'ol-popup';
+    document.body.appendChild(popupElement);
     
-    map = L.map('map').setView(moscowCenter, 10);
+    // Create popup closer button
+    const popupCloser = document.createElement('a');
+    popupCloser.href = '#';
+    popupCloser.className = 'ol-popup-closer';
+    popupCloser.innerHTML = '×';
+    popupElement.appendChild(popupCloser);
     
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 18
-    }).addTo(map);
+    // Create popup content container
+    const popupContent = document.createElement('div');
+    popupContent.id = 'popup-content';
+    popupElement.appendChild(popupContent);
     
-    // Initialize marker layer
-    markersLayer = L.layerGroup().addTo(map);
+    // Create popup overlay
+    popupOverlay = new ol.Overlay({
+        element: popupElement,
+        autoPan: {
+            animation: {
+                duration: 250
+            }
+        }
+    });
+    
+    // Popup closer handler
+    popupCloser.onclick = function() {
+        popupOverlay.setPosition(undefined);
+        popupCloser.blur();
+        return false;
+    };
+    
+    // Create vector source and layer for markers
+    vectorSource = new ol.source.Vector();
+    
+    vectorLayer = new ol.layer.Vector({
+        source: vectorSource
+    });
+    
+    // Center on Moscow (longitude, latitude in EPSG:4326)
+    const moscowCoords = [37.6173, 55.7558];
+    const moscowCoordsProjected = ol.proj.fromLonLat(moscowCoords);
+    
+    // Create map
+    map = new ol.Map({
+        target: 'map',
+        layers: [
+            // OpenStreetMap tile layer
+            new ol.layer.Tile({
+                source: new ol.source.OSM()
+            }),
+            // Vector layer for markers
+            vectorLayer
+        ],
+        overlays: [popupOverlay],
+        view: new ol.View({
+            center: moscowCoordsProjected,
+            zoom: 10
+        })
+    });
+    
+    // Click handler for markers
+    map.on('click', function(event) {
+        const feature = map.forEachFeatureAtPixel(event.pixel, function(feature) {
+            return feature;
+        });
+        
+        if (feature) {
+            const coordinates = feature.getGeometry().getCoordinates();
+            const props = feature.get('properties');
+            
+            popupContent.innerHTML = createPopupContent(props);
+            popupOverlay.setPosition(coordinates);
+        } else {
+            popupOverlay.setPosition(undefined);
+        }
+    });
+    
+    // Change cursor on hover
+    map.on('pointermove', function(event) {
+        const pixel = map.getEventPixel(event.originalEvent);
+        const hit = map.hasFeatureAtPixel(pixel);
+        map.getTarget().style.cursor = hit ? 'pointer' : '';
+    });
     
     // Load initial data
     loadMeasurements();
@@ -59,7 +135,7 @@ async function loadMeasurements() {
         const geojson = await response.json();
         
         // Clear existing markers
-        markersLayer.clearLayers();
+        vectorSource.clear();
         
         // Add markers for each feature
         if (geojson.features && geojson.features.length > 0) {
@@ -84,36 +160,39 @@ async function loadMeasurements() {
  * @param {Object} feature - GeoJSON feature
  */
 function addMarkerToMap(feature) {
-    const coords = feature.geometry.coordinates;
+    const coords = feature.geometry.coordinates; // [longitude, latitude]
     const props = feature.properties;
     
     // Determine marker color based on safety
     const markerColor = getMarkerColor(props.value, props.safe_limit);
     
-    // Create custom icon
-    const icon = L.divIcon({
-        className: 'custom-marker',
-        html: `<div style="
-            background-color: ${markerColor};
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            border: 3px solid white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        "></div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+    // Create point geometry (convert from EPSG:4326 to EPSG:3857)
+    const point = new ol.geom.Point(ol.proj.fromLonLat(coords));
+    
+    // Create feature
+    const olFeature = new ol.Feature({
+        geometry: point,
+        properties: props
     });
     
-    // Create marker
-    const marker = L.marker([coords[1], coords[0]], { icon: icon });
+    // Create marker style
+    const markerStyle = new ol.style.Style({
+        image: new ol.style.Circle({
+            radius: 15,
+            fill: new ol.style.Fill({
+                color: markerColor
+            }),
+            stroke: new ol.style.Stroke({
+                color: '#ffffff',
+                width: 3
+            })
+        })
+    });
     
-    // Create popup content
-    const popupContent = createPopupContent(props);
-    marker.bindPopup(popupContent);
+    olFeature.setStyle(markerStyle);
     
-    // Add to layer
-    marker.addTo(markersLayer);
+    // Add to vector source
+    vectorSource.addFeature(olFeature);
 }
 
 /**

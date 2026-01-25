@@ -31,7 +31,7 @@
 
 ### Frontend
 - Bootstrap 5
-- Leaflet.js
+- OpenLayers
 - Chart.js
 - Vanilla JavaScript
 
