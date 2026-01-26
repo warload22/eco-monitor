@@ -44,7 +44,7 @@ function getTemperatureColor(temp) {
 }
 
 /**
- * Создать слой температуры (простые цветные круги)
+ * Создать слой температуры (крупные цветные круги)
  * @returns {ol.layer.Vector} Векторный слой
  */
 function createTemperatureLayer() {
@@ -58,52 +58,72 @@ function createTemperatureLayer() {
             
             return new ol.style.Style({
                 image: new ol.style.Circle({
-                    radius: 12,
+                    radius: 16,  // Увеличен размер
                     fill: new ol.style.Fill({ color: color }),
                     stroke: new ol.style.Stroke({
                         color: '#ffffff',
-                        width: 2
+                        width: 3  // Толстая белая обводка
                     })
                 })
             });
         },
-        visible: false
+        visible: false,
+        zIndex: 99  // Под слоем ветра
     });
     
-    console.log('[Temperature] Слой создан');
+    console.log('[Temperature] Слой создан (крупные маркеры)');
     return layer;
 }
 
 /**
- * Создать SVG стрелку для ветра
+ * Создать SVG стрелку для ветра (КРУПНАЯ и ЗАМЕТНАЯ)
  * @param {string} color - Цвет стрелки
  * @returns {string} Data URI
  */
 function createWindArrowSVG(color) {
+    // Большая, толстая стрелка с контрастным контуром
     const svg = `
-        <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 5 L25 15 L22 15 L22 35 L18 35 L18 15 L15 15 Z" 
-                  fill="${color}" stroke="#ffffff" stroke-width="1.5"/>
+        <svg width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+            <!-- Тень для контраста -->
+            <filter id="shadow">
+                <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.4"/>
+            </filter>
+            <!-- Основная стрелка - толстая и заметная -->
+            <path d="M24 4 L32 18 L27 18 L27 42 L21 42 L21 18 L16 18 Z" 
+                  fill="${color}" 
+                  stroke="#000000" 
+                  stroke-width="1.5"
+                  filter="url(#shadow)"/>
+            <!-- Белая обводка поверх для контраста -->
+            <path d="M24 4 L32 18 L27 18 L27 42 L21 42 L21 18 L16 18 Z" 
+                  fill="none" 
+                  stroke="#ffffff" 
+                  stroke-width="2.5"/>
+            <!-- Внутренний контур цветом -->
+            <path d="M24 6 L30 17 L26 17 L26 40 L22 40 L22 17 L18 17 Z" 
+                  fill="${color}" 
+                  stroke="none"/>
         </svg>
     `;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 
 /**
- * Получить цвет для скорости ветра
+ * Получить цвет для скорости ветра (яркие контрастные цвета)
  * @param {number} speed - Скорость в м/с
  * @returns {string} Hex цвет
  */
 function getWindColor(speed) {
-    if (speed < 2) return '#74add1';      // Слабый - голубой
-    if (speed < 5) return '#4575b4';      // Умеренный - синий  
-    if (speed < 8) return '#fdae61';      // Свежий - оранжевый
-    if (speed < 12) return '#f46d43';     // Сильный - красно-оранжевый
-    return '#d73027';                      // Очень сильный - красный
+    if (speed < 2) return '#17a2b8';      // Штиль - бирюзовый
+    if (speed < 4) return '#28a745';      // Слабый - зелёный
+    if (speed < 7) return '#ffc107';      // Умеренный - жёлтый
+    if (speed < 10) return '#fd7e14';     // Свежий - оранжевый
+    if (speed < 14) return '#dc3545';     // Сильный - красный
+    return '#6f42c1';                      // Очень сильный - фиолетовый
 }
 
 /**
- * Создать слой ветра (простые стрелки)
+ * Создать слой ветра (КРУПНЫЕ стрелки с анимацией)
  * @returns {ol.layer.Vector} Векторный слой
  */
 function createWindLayer() {
@@ -119,27 +139,32 @@ function createWindLayer() {
             // Направление: метеорологическое (откуда дует) -> куда дует
             // OpenLayers: 0 = восток, вращение по часовой
             // Метео: 0 = север (откуда дует)
-            // Нужно: куда дует, поэтому +180, затем корректируем для OL
+            // Нужно показать КУДА дует, поэтому +180, затем -90 для OL
             const rotation = ((direction + 180 - 90) * Math.PI) / 180;
             
-            // Масштаб зависит от фазы анимации (сохранённой в feature)
+            // Фаза анимации для плавного мерцания
             const phase = feature.get('animPhase') || 0;
-            const opacity = 0.6 + 0.4 * Math.sin(phase);
+            const opacity = 0.7 + 0.3 * Math.sin(phase);
+            
+            // Масштаб зависит от скорости ветра (сильнее ветер = больше стрелка)
+            const baseScale = 1.0;
+            const speedScale = Math.min(1.3, 0.9 + speed * 0.03);
             
             return new ol.style.Style({
                 image: new ol.style.Icon({
                     src: createWindArrowSVG(color),
-                    scale: 0.8,
+                    scale: baseScale * speedScale,
                     rotation: rotation,
                     opacity: opacity,
                     anchor: [0.5, 0.5]
                 })
             });
         },
-        visible: false
+        visible: false,
+        zIndex: 100  // Поверх других слоёв
     });
     
-    console.log('[Wind] Слой создан');
+    console.log('[Wind] Слой создан (крупные стрелки)');
     return layer;
 }
 
@@ -149,6 +174,7 @@ function createWindLayer() {
  */
 async function loadWeatherData(map) {
     try {
+        console.log('[WeatherLayers] ========================================');
         console.log('[WeatherLayers] Загрузка данных из /api/weather/current...');
         
         const response = await fetch('/api/weather/current');
@@ -157,7 +183,24 @@ async function loadWeatherData(map) {
         }
         
         const result = await response.json();
-        console.log('[WeatherLayers] Получено точек:', result.count);
+        
+        // Консольный отчёт
+        console.log('[WeatherLayers] ========================================');
+        console.log('[WeatherLayers] ОТЧЁТ О ЗАГРУЗКЕ ДАННЫХ');
+        console.log('[WeatherLayers] ========================================');
+        console.log(`[WeatherLayers] Источник данных: ${result.source === 'database' ? 'База данных (реальные)' : 'Демо-данные'}`);
+        console.log(`[WeatherLayers] Количество точек: ${result.count}`);
+        console.log(`[WeatherLayers] Примечание: ${result.note}`);
+        
+        if (result.data && result.data.length > 0) {
+            console.log('[WeatherLayers] Точки данных:');
+            result.data.forEach((point, i) => {
+                const temp = point.temperature !== null ? `${point.temperature > 0 ? '+' : ''}${point.temperature}°C` : 'н/д';
+                const wind = point.wind_speed !== null ? `${point.wind_speed} м/с` : 'н/д';
+                console.log(`  ${i+1}. ${point.name}: ${temp}, ветер ${wind}`);
+            });
+        }
+        console.log('[WeatherLayers] ========================================');
         
         if (!result.data || result.data.length === 0) {
             console.warn('[WeatherLayers] Нет данных!');

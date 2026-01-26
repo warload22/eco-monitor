@@ -366,61 +366,125 @@ def получить_векторы_ветра():
 @bp.route('/current', methods=['GET'])
 def получить_текущую_погоду():
     """
-    Получить текущие погодные условия для нескольких точек Москвы
+    Получить текущие погодные данные для всех активных локаций Москвы
+    
+    Сначала пытается получить реальные данные из БД.
+    Если данных нет - генерирует тестовые для демонстрации.
     
     Returns:
-        JSON с массивом точек погодных данных (10 точек)
+        JSON с массивом точек погодных данных
     """
     try:
+        from database import get_db
+        from datetime import datetime, timedelta
         import random
-        from datetime import datetime
         
-        # Базовая температура (можно варьировать по сезону)
-        base_temp = 2.0  # Зима - январь
-        
-        # 10 точек по Москве с разными координатами
-        # Каждая точка имеет небольшое отклонение от базовой температуры
-        точки_москвы = [
-            {'name': 'Центр (Кремль)', 'lat': 55.7520, 'lon': 37.6175, 'temp_offset': 0.5},
-            {'name': 'Север (ВДНХ)', 'lat': 55.8284, 'lon': 37.6385, 'temp_offset': -1.2},
-            {'name': 'Юг (Царицыно)', 'lat': 55.6194, 'lon': 37.6862, 'temp_offset': 0.8},
-            {'name': 'Запад (Крылатское)', 'lat': 55.7579, 'lon': 37.4087, 'temp_offset': -0.3},
-            {'name': 'Восток (Измайлово)', 'lat': 55.7887, 'lon': 37.7948, 'temp_offset': -0.8},
-            {'name': 'Северо-запад (Строгино)', 'lat': 55.8045, 'lon': 37.4024, 'temp_offset': -1.5},
-            {'name': 'Северо-восток (Медведково)', 'lat': 55.8815, 'lon': 37.6590, 'temp_offset': -1.8},
-            {'name': 'Юго-запад (Тёплый Стан)', 'lat': 55.6180, 'lon': 37.5030, 'temp_offset': 0.3},
-            {'name': 'Юго-восток (Марьино)', 'lat': 55.6500, 'lon': 37.7440, 'temp_offset': 0.6},
-            {'name': 'Внуково (аэропорт)', 'lat': 55.5910, 'lon': 37.2615, 'temp_offset': -2.0},
-        ]
-        
-        # Базовое направление ветра (западный ветер ~270°)
-        base_wind_direction = 265
-        base_wind_speed = 4.5
-        
-        # Генерируем данные для каждой точки
         данные = []
-        timestamp = datetime.utcnow().isoformat() + 'Z'
+        используется_реальные_данные = False
         
-        for точка in точки_москвы:
-            # Температура = базовая + смещение для точки + небольшой рандом
-            temperature = round(base_temp + точка['temp_offset'] + random.uniform(-0.5, 0.5), 1)
+        # Пробуем получить реальные данные из БД
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
             
-            # Скорость ветра с небольшой вариацией
-            wind_speed = round(base_wind_speed + random.uniform(-1.5, 1.5), 1)
-            wind_speed = max(0.5, wind_speed)  # Минимум 0.5 м/с
+            # Получаем последние измерения температуры и ветра для каждой локации
+            query = """
+                WITH latest_weather AS (
+                    SELECT DISTINCT ON (l.id, p.name)
+                        l.id as location_id,
+                        l.name as location_name,
+                        l.latitude,
+                        l.longitude,
+                        l.district,
+                        p.name as parameter_name,
+                        m.value,
+                        m.measured_at
+                    FROM measurements m
+                    JOIN locations l ON m.location_id = l.id
+                    JOIN parameters p ON m.parameter_id = p.id
+                    WHERE l.is_active = TRUE
+                        AND p.name IN ('temperature', 'wind_speed', 'wind_direction')
+                        AND m.measured_at > NOW() - INTERVAL '24 hours'
+                    ORDER BY l.id, p.name, m.measured_at DESC
+                )
+                SELECT 
+                    location_id,
+                    location_name,
+                    latitude,
+                    longitude,
+                    district,
+                    MAX(CASE WHEN parameter_name = 'temperature' THEN value END) as temperature,
+                    MAX(CASE WHEN parameter_name = 'wind_speed' THEN value END) as wind_speed,
+                    MAX(CASE WHEN parameter_name = 'wind_direction' THEN value END) as wind_direction,
+                    MAX(measured_at) as timestamp
+                FROM latest_weather
+                GROUP BY location_id, location_name, latitude, longitude, district
+                HAVING MAX(CASE WHEN parameter_name = 'temperature' THEN value END) IS NOT NULL
+            """
             
-            # Направление ветра с небольшой вариацией
-            wind_direction = round((base_wind_direction + random.uniform(-25, 25)) % 360, 0)
+            cursor.execute(query)
+            результаты = cursor.fetchall()
+            cursor.close()
             
-            данные.append({
-                'name': точка['name'],
-                'lat': точка['lat'],
-                'lon': точка['lon'],
-                'temperature': temperature,
-                'wind_speed': wind_speed,
-                'wind_direction': wind_direction,
-                'timestamp': timestamp
-            })
+            for row in результаты:
+                данные.append({
+                    'name': row['location_name'],
+                    'district': row['district'],
+                    'lat': float(row['latitude']),
+                    'lon': float(row['longitude']),
+                    'temperature': float(row['temperature']) if row['temperature'] else None,
+                    'wind_speed': float(row['wind_speed']) if row['wind_speed'] else 3.0,
+                    'wind_direction': float(row['wind_direction']) if row['wind_direction'] else 270.0,
+                    'timestamp': row['timestamp'].isoformat() + 'Z' if row['timestamp'] else None
+                })
+            
+            if len(данные) >= 3:
+                используется_реальные_данные = True
+                current_app.logger.info(f"Загружено {len(данные)} точек реальных погодных данных")
+                
+        except Exception as db_error:
+            current_app.logger.warning(f"Не удалось получить данные из БД: {db_error}")
+        
+        # Если реальных данных мало - генерируем тестовые
+        if not используется_реальные_данные:
+            current_app.logger.info("Используются тестовые данные погоды")
+            
+            # Базовая температура (зима - январь)
+            base_temp = 1.0
+            base_wind_direction = 265  # Западный ветер
+            base_wind_speed = 4.0
+            
+            # 10 точек по Москве
+            точки_москвы = [
+                {'name': 'Центр (Кремль)', 'district': 'Центральный', 'lat': 55.7520, 'lon': 37.6175, 'offset': 0.5},
+                {'name': 'ВДНХ', 'district': 'Северо-Восточный', 'lat': 55.8284, 'lon': 37.6385, 'offset': -1.2},
+                {'name': 'Царицыно', 'district': 'Южный', 'lat': 55.6194, 'lon': 37.6862, 'offset': 0.8},
+                {'name': 'Крылатское', 'district': 'Западный', 'lat': 55.7579, 'lon': 37.4087, 'offset': -0.3},
+                {'name': 'Измайлово', 'district': 'Восточный', 'lat': 55.7887, 'lon': 37.7948, 'offset': -0.8},
+                {'name': 'Строгино', 'district': 'Северо-Западный', 'lat': 55.8045, 'lon': 37.4024, 'offset': -1.5},
+                {'name': 'Медведково', 'district': 'Северо-Восточный', 'lat': 55.8815, 'lon': 37.6590, 'offset': -1.8},
+                {'name': 'Тёплый Стан', 'district': 'Юго-Западный', 'lat': 55.6180, 'lon': 37.5030, 'offset': 0.3},
+                {'name': 'Марьино', 'district': 'Юго-Восточный', 'lat': 55.6500, 'lon': 37.7440, 'offset': 0.6},
+                {'name': 'Внуково', 'district': 'Западный', 'lat': 55.5910, 'lon': 37.2615, 'offset': -2.0},
+            ]
+            
+            timestamp = datetime.utcnow().isoformat() + 'Z'
+            
+            for точка in точки_москвы:
+                temperature = round(base_temp + точка['offset'] + random.uniform(-0.5, 0.5), 1)
+                wind_speed = round(max(0.5, base_wind_speed + random.uniform(-1.5, 1.5)), 1)
+                wind_direction = round((base_wind_direction + random.uniform(-25, 25)) % 360)
+                
+                данные.append({
+                    'name': точка['name'],
+                    'district': точка['district'],
+                    'lat': точка['lat'],
+                    'lon': точка['lon'],
+                    'temperature': temperature,
+                    'wind_speed': wind_speed,
+                    'wind_direction': wind_direction,
+                    'timestamp': timestamp
+                })
         
         return jsonify({
             'count': len(данные),
@@ -430,7 +494,8 @@ def получить_текущую_погоду():
                 'wind_speed': 'м/с',
                 'wind_direction': 'градусы'
             },
-            'note': 'Данные для 10 точек Москвы'
+            'source': 'database' if используется_реальные_данные else 'demo',
+            'note': 'Реальные данные из БД' if используется_реальные_данные else 'Демонстрационные данные для 10 точек Москвы'
         }), 200
     
     except Exception as e:
