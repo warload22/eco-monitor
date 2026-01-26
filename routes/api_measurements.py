@@ -55,6 +55,15 @@ def получить_измерения():
         }), 400
     
     try:
+        # Параметры фильтрации по категории
+        # По умолчанию исключаем погодные данные - они отображаются на отдельных слоях
+        category = request.args.get('category') or None
+        exclude_category = request.args.get('exclude_category', 'погода')
+        
+        # Если явно указано exclude_category=none, не исключаем ничего
+        if exclude_category and exclude_category.lower() == 'none':
+            exclude_category = None
+        
         # Получаем измерения из БД через бизнес-логику
         измерения = получить_измерения_с_фильтрами(
             parameter_id=параметры_фильтра.parameter_id,
@@ -62,7 +71,9 @@ def получить_измерения():
             date_from=параметры_фильтра.date_from,
             date_to=параметры_фильтра.date_to,
             limit=параметры_фильтра.limit,
-            offset=параметры_фильтра.offset
+            offset=параметры_фильтра.offset,
+            category=category,
+            exclude_category=exclude_category
         )
         
         # Преобразуем в GeoJSON

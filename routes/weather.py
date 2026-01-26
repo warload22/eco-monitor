@@ -438,14 +438,14 @@ def получить_текущую_погоду():
                     'timestamp': row['timestamp'].isoformat() + 'Z' if row['timestamp'] else None
                 })
             
-            if len(данные) >= 3:
+            if len(данные) >= 1:
                 используется_реальные_данные = True
                 current_app.logger.info(f"Загружено {len(данные)} точек реальных погодных данных")
                 
         except Exception as db_error:
             current_app.logger.warning(f"Не удалось получить данные из БД: {db_error}")
         
-        # Если реальных данных мало - генерируем тестовые
+        # Если реальных данных нет - генерируем тестовые
         if not используется_реальные_данные:
             current_app.logger.info("Используются тестовые данные погоды")
             

@@ -247,6 +247,9 @@ def сохранить_измерения(
                 if ключ in измерение:
                     extra_data[ключ] = измерение[ключ]
             
+            # Название локации/станции (если указано)
+            название_локации = измерение.get('station_name')
+            
             # Создаем измерение
             создать_измерение(
                 parameter_id=parameter_id,
@@ -254,7 +257,8 @@ def сохранить_измерения(
                 latitude=float(измерение['latitude']),
                 longitude=float(измерение['longitude']),
                 source_id=source_id,
-                extra_data=extra_data if extra_data else None
+                extra_data=extra_data if extra_data else None,
+                название_локации=название_локации
             )
             
             сохранено += 1

@@ -45,8 +45,14 @@ def найти_или_создать_локацию(
     if существующая:
         return существующая['id']
     
-    # Создаем новую локацию
-    имя_локации = название or f"Точка ({lat_округлено}, {lon_округлено})"
+    # Создаем новую локацию с информативным именем
+    if название:
+        имя_локации = название
+    elif 55.5 <= lat_округлено <= 56.0 and 37.0 <= lon_округлено <= 38.0:
+        # Московский регион
+        имя_локации = f"Москва ({lat_округлено}, {lon_округлено})"
+    else:
+        имя_локации = f"Точка ({lat_округлено}, {lon_округлено})"
     
     запрос_создания = """
         INSERT INTO locations (name, latitude, longitude, is_active)
@@ -69,7 +75,8 @@ def создать_измерение(
     latitude: float,
     longitude: float,
     source_id: Optional[int] = None,
-    extra_data: Optional[Dict[str, Any]] = None
+    extra_data: Optional[Dict[str, Any]] = None,
+    название_локации: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Создать новое измерение
@@ -81,12 +88,13 @@ def создать_измерение(
         longitude: Долгота
         source_id: ID источника данных (опционально)
         extra_data: Дополнительные данные в формате JSON (опционально)
+        название_локации: Название локации/станции (опционально)
         
     Returns:
         Словарь с данными созданного измерения
     """
     # Находим или создаем локацию
-    location_id = найти_или_создать_локацию(latitude, longitude)
+    location_id = найти_или_создать_локацию(latitude, longitude, название_локации)
     
     # Создаем измерение
     запрос = """
@@ -126,7 +134,9 @@ def получить_измерения_с_фильтрами(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None,
     limit: int = 100,
-    offset: int = 0
+    offset: int = 0,
+    category: Optional[str] = None,
+    exclude_category: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Получить список измерений с применением фильтров
@@ -138,6 +148,8 @@ def получить_измерения_с_фильтрами(
         date_to: Фильтр по конечной дате
         limit: Максимальное количество результатов
         offset: Смещение для пагинации
+        category: Фильтр по категории параметра (например, 'качество_воздуха')
+        exclude_category: Исключить категорию (например, 'погода')
         
     Returns:
         Список словарей с данными измерений
@@ -183,6 +195,14 @@ def получить_измерения_с_фильтрами(
     if date_to:
         запрос += " AND m.measured_at <= %s"
         параметры.append(date_to)
+    
+    if category:
+        запрос += " AND p.category = %s"
+        параметры.append(category)
+    
+    if exclude_category:
+        запрос += " AND (p.category IS NULL OR p.category != %s)"
+        параметры.append(exclude_category)
     
     запрос += " ORDER BY m.measured_at DESC LIMIT %s OFFSET %s"
     параметры.extend([limit, offset])
