@@ -7,6 +7,51 @@ from datetime import datetime
 from database import execute_query, get_db
 import psycopg
 
+# Словарь переводов названий параметров
+ПЕРЕВОДЫ_ПАРАМЕТРОВ = {
+    # Качество воздуха
+    'PM2.5': 'Частицы PM2.5',
+    'PM10': 'Частицы PM10',
+    'pm2_5': 'Частицы PM2.5',
+    'pm10': 'Частицы PM10',
+    'NO2': 'Диоксид азота (NO₂)',
+    'nitrogen_dioxide': 'Диоксид азота (NO₂)',
+    'SO2': 'Диоксид серы (SO₂)',
+    'sulphur_dioxide': 'Диоксид серы (SO₂)',
+    'CO': 'Угарный газ (CO)',
+    'carbon_monoxide': 'Угарный газ (CO)',
+    'O3': 'Озон (O₃)',
+    'ozone': 'Озон (O₃)',
+    # Погода
+    'temperature': 'Температура воздуха',
+    'humidity': 'Влажность воздуха',
+    'relative_humidity': 'Относительная влажность',
+    'pressure': 'Атмосферное давление',
+    'surface_pressure': 'Атмосферное давление',
+    'wind_speed': 'Скорость ветра',
+    'wind_direction': 'Направление ветра',
+    'precipitation': 'Осадки',
+    # Дополнительные
+    'uv_index': 'УФ-индекс',
+    'visibility': 'Видимость',
+    'cloudiness': 'Облачность',
+    'cloud_cover': 'Облачность'
+}
+
+ПЕРЕВОДЫ_КАТЕГОРИЙ = {
+    'качество_воздуха': 'Качество воздуха',
+    'air_quality': 'Качество воздуха',
+    'погода': 'Погода',
+    'weather': 'Погода',
+    'radiation': 'Радиация',
+    'noise': 'Шум'
+}
+
+
+def получить_название_параметра_ru(название: str) -> str:
+    """Получить русское название параметра"""
+    return ПЕРЕВОДЫ_ПАРАМЕТРОВ.get(название, название)
+
 
 def найти_или_создать_локацию(
     latitude: float,
@@ -212,11 +257,13 @@ def получить_измерения_с_фильтрами(
     # Преобразуем результаты в нужный формат
     измерения = []
     for строка in результаты:
+        параметр_ru = получить_название_параметра_ru(строка['parameter_name'])
         измерения.append({
             'id': строка['id'],
             'parameter_id': строка['parameter_id'],
             'location_id': строка['location_id'],
             'parameter_name': строка['parameter_name'],
+            'parameter_name_ru': параметр_ru,
             'parameter_unit': строка['parameter_unit'],
             'value': float(строка['value']),
             'latitude': float(строка['latitude']),
@@ -249,54 +296,16 @@ def получить_все_параметры() -> List[Dict[str, Any]]:
     
     результаты = execute_query(запрос)
     
-    # Словарь переводов названий параметров
-    переводы_параметров = {
-        # Качество воздуха
-        'PM2.5': 'Частицы PM2.5',
-        'PM10': 'Частицы PM10',
-        'pm2_5': 'Частицы PM2.5',
-        'pm10': 'Частицы PM10',
-        'NO2': 'Диоксид азота (NO₂)',
-        'nitrogen_dioxide': 'Диоксид азота (NO₂)',
-        'SO2': 'Диоксид серы (SO₂)',
-        'sulphur_dioxide': 'Диоксид серы (SO₂)',
-        'CO': 'Угарный газ (CO)',
-        'carbon_monoxide': 'Угарный газ (CO)',
-        'O3': 'Озон (O₃)',
-        'ozone': 'Озон (O₃)',
-        # Погода
-        'temperature': 'Температура воздуха',
-        'humidity': 'Влажность воздуха',
-        'relative_humidity': 'Относительная влажность',
-        'pressure': 'Атмосферное давление',
-        'surface_pressure': 'Атмосферное давление',
-        'wind_speed': 'Скорость ветра',
-        'wind_direction': 'Направление ветра',
-        'precipitation': 'Осадки',
-        # Дополнительные
-        'uv_index': 'УФ-индекс',
-        'visibility': 'Видимость',
-        'cloudiness': 'Облачность'
-    }
-    
-    переводы_категорий = {
-        'качество_воздуха': 'Качество воздуха',
-        'air_quality': 'Качество воздуха',
-        'weather': 'Погода',
-        'radiation': 'Радиация',
-        'noise': 'Шум'
-    }
-    
     return [
         {
             'id': строка['id'],
             'name': строка['name'],
-            'name_ru': переводы_параметров.get(строка['name'], строка['name']),
+            'name_ru': получить_название_параметра_ru(строка['name']),
             'unit': строка['unit'],
             'description': строка['description'],
             'safe_limit': float(строка['safe_limit']) if строка['safe_limit'] else None,
             'category': строка.get('category'),
-            'category_ru': переводы_категорий.get(строка.get('category'), строка.get('category'))
+            'category_ru': ПЕРЕВОДЫ_КАТЕГОРИЙ.get(строка.get('category'), строка.get('category'))
         }
         for строка in результаты
     ]
@@ -320,17 +329,21 @@ def получить_статистику_по_параметру(
     Returns:
         Словарь со статистикой (avg, max, min, count) или None
     """
-    запрос = """
-        SELECT 
-            p.name as parameter_name,
-            p.unit as parameter_unit,
-            p.safe_limit,
-            l.name as location_name,
-            COUNT(m.id) as count,
-            AVG(m.value) as avg_value,
-            MAX(m.value) as max_value,
-            MIN(m.value) as min_value,
-            STDDEV(m.value) as std_dev
+    базовые_поля = """
+        p.name as parameter_name,
+        p.unit as parameter_unit,
+        p.safe_limit,
+        COUNT(m.id) as count,
+        AVG(m.value) as avg_value,
+        MAX(m.value) as max_value,
+        MIN(m.value) as min_value,
+        STDDEV(m.value) as std_dev
+    """
+    if location_id:
+        базовые_поля += ", l.name as location_name"
+    
+    запрос = f"""
+        SELECT {базовые_поля}
         FROM measurements m
         JOIN parameters p ON m.parameter_id = p.id
         JOIN locations l ON m.location_id = l.id
@@ -352,15 +365,21 @@ def получить_статистику_по_параметру(
         запрос += " AND m.measured_at <= %s"
         параметры.append(date_to)
     
-    запрос += " GROUP BY p.id, p.name, p.unit, p.safe_limit, l.name"
+    group_by = " GROUP BY p.id, p.name, p.unit, p.safe_limit"
+    if location_id:
+        group_by += ", l.name"
+    запрос += group_by
     
     результат = execute_query(запрос, tuple(параметры), fetch_one=True)
     
     if not результат or результат['count'] == 0:
         return None
     
+    параметр_ru = получить_название_параметра_ru(результат['parameter_name'])
+    
     return {
-        'parameter': результат['parameter_name'],
+        'parameter': параметр_ru,
+        'parameter_code': результат['parameter_name'],
         'unit': результат['parameter_unit'],
         'safe_limit': float(результат['safe_limit']) if результат['safe_limit'] else None,
         'location_name': результат['location_name'] if location_id else None,
@@ -445,6 +464,7 @@ def получить_сырые_данные_для_отчета(
             else True
         )
         
+        параметр_ru = получить_название_параметра_ru(строка['parameter_name'])
         данные.append({
             'id': строка['id'],
             'measured_at': строка['measured_at'].isoformat(),
@@ -453,7 +473,8 @@ def получить_сырые_данные_для_отчета(
             'latitude': float(строка['latitude']),
             'longitude': float(строка['longitude']),
             'district': строка.get('district'),
-            'parameter_name': строка['parameter_name'],
+            'parameter_name': параметр_ru,
+            'parameter_code': строка['parameter_name'],
             'unit': строка['unit'],
             'is_safe': безопасно
         })
@@ -491,6 +512,7 @@ def преобразовать_в_geojson(измерения: List[Dict[str, Any
                 'parameter_id': изм['parameter_id'],
                 'location_id': изм['location_id'],
                 'parameter_name': изм['parameter_name'],
+                'parameter_name_ru': изм.get('parameter_name_ru'),
                 'unit': изм['parameter_unit'],
                 'value': изм['value'],
                 'location_name': изм['location_name'],

@@ -59,6 +59,10 @@ def получить_измерения():
         # По умолчанию исключаем погодные данные - они отображаются на отдельных слоях
         category = request.args.get('category') or None
         exclude_category = request.args.get('exclude_category', 'погода')
+
+        # Если выбран конкретный параметр, не исключаем его по категории
+        if параметры_фильтра.parameter_id:
+            exclude_category = None
         
         # Если явно указано exclude_category=none, не исключаем ничего
         if exclude_category and exclude_category.lower() == 'none':

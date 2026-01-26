@@ -19,6 +19,25 @@ body {
     z-index: 1;
 }
 
+/* Map status overlay */
+.map-status-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #495057;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 5;
+    min-width: 240px;
+}
+
 /* OpenLayers popup customization */
 .ol-popup {
     position: absolute;

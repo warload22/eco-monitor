@@ -23,11 +23,13 @@ def create_app(config_class=Config) -> Flask:
     from routes.map_view import bp as map_bp
     from routes.api_measurements import bp as api_bp
     from routes.reports import bp as reports_bp
+    from routes.api_reports import bp as api_reports_bp
     from routes.weather import bp as weather_bp
     
     app.register_blueprint(map_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(reports_bp, url_prefix='/reports')
+    app.register_blueprint(api_reports_bp, url_prefix='/api/reports')
     app.register_blueprint(weather_bp, url_prefix='/api/weather')
     
     # Database lifecycle management

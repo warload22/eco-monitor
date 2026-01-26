@@ -26,7 +26,7 @@ async function загрузитьПараметры() {
             option.value = param.id;
             // Используем name_ru, если доступно, иначе name
             const displayName = param.name_ru || param.name;
-            option.textContent = `${displayName} (${param.unit})`;
+            option.textContent = `${displayName}, ${param.unit}`;
             selectElement.appendChild(option);
         });
         

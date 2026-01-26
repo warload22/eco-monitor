@@ -40,7 +40,7 @@ async function загрузитьПараметры() {
             const option = document.createElement('option');
             option.value = param.id;
             const displayName = param.name_ru || param.name;
-            option.textContent = `${displayName} (${param.unit})`;
+            option.textContent = `${displayName}, ${param.unit}`;
             option.dataset.unit = param.unit;
             option.dataset.name = displayName;
             select.appendChild(option);
@@ -169,6 +169,10 @@ async function получитьСтатистику(parameterId, locationId, dat
     
     const response = await fetch(`/reports/api/summary?${params}`);
     
+    if (response.status === 404) {
+        return null;
+    }
+    
     if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Ошибка при получении статистики');
@@ -188,6 +192,10 @@ async function получитьСырыеДанные(parameterId, locationId, d
     if (dateTo) params.append('date_to', dateTo);
     
     const response = await fetch(`/reports/api/raw_data?${params}`);
+    
+    if (response.status === 404) {
+        return [];
+    }
     
     if (!response.ok) {
         const error = await response.json();

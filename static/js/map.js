@@ -15,6 +15,21 @@ let currentFilters = {
 let isLoading = false;
 
 /**
+ * Обновить статус отображения карты
+ */
+function setMapStatus(message, isVisible = true) {
+    const statusElement = document.getElementById('mapStatus');
+    if (!statusElement) return;
+    
+    if (isVisible) {
+        statusElement.textContent = message;
+        statusElement.style.display = 'block';
+    } else {
+        statusElement.style.display = 'none';
+    }
+}
+
+/**
  * Инициализировать карту OpenLayers
  */
 function initMap() {
@@ -144,6 +159,7 @@ function showLoadingIndicator() {
         applyButton.disabled = true;
         applyButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загрузка...';
     }
+    setMapStatus('Данные загружаются...', true);
 }
 
 /**
@@ -185,8 +201,12 @@ async function loadMeasurements() {
             params.append('location_id', currentFilters.location_id);
         }
         
-        // Добавить временной фильтр (часы), если нужно
-        // API пока не поддерживает hours, но можем добавить для будущего расширения
+        // Добавить временной фильтр (часы)
+        if (currentFilters.hours) {
+            const now = new Date();
+            const dateFrom = new Date(now.getTime() - currentFilters.hours * 60 * 60 * 1000);
+            params.append('date_from', dateFrom.toISOString());
+        }
         
         // Получить данные из API
         const response = await fetch(`/api/measurements?${params.toString()}`);
@@ -218,14 +238,18 @@ async function loadMeasurements() {
             updateLastUpdateTime();
             
             console.log(t ? t('console.measurementsLoaded', {count: geojson.features.length}) : `Загружено ${geojson.features.length} измерени(й)`);
+            setMapStatus('', false);
         } else {
             console.log(t ? t('console.noMeasurements') : 'Нет измерений для текущих фильтров');
             updateStationCount(0);
+            const noDataMessage = t ? t('map.noData') : 'Для выбранных фильтров данных нет';
+            setMapStatus(noDataMessage, true);
         }
         
     } catch (error) {
         console.error('Ошибка загрузки измерений:', error);
         alert(t ? t('map.error') : 'Ошибка загрузки данных. Пожалуйста, попробуйте позже.');
+        setMapStatus('Ошибка загрузки данных. Проверьте соединение.', true);
     } finally {
         // Скрыть индикатор загрузки
         hideLoadingIndicator();
@@ -372,7 +396,7 @@ function createPopupContent(props) {
             ${qualityLevel}
             <hr class="my-2">
             <div class="mb-2">
-                <strong>Параметр:</strong> ${props.parameter_name}
+                <strong>Параметр:</strong> ${props.parameter_name_ru || props.parameter_name}
             </div>
             <div class="mb-2">
                 <strong>Значение:</strong> 
