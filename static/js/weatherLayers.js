@@ -14,7 +14,74 @@ let windAnimationFrame = null;
 let windAnimationTime = 0;
 
 /**
- * Создать слой текстовых подписей температуры
+ * Получить цвет температуры в зависимости от значения
+ * @param {number} temp - Температура в градусах Цельсия
+ * @returns {string} Hex цвет
+ */
+function получитьЦветТемпературы(temp) {
+    if (temp < -20) {
+        return '#1a0052';  // Очень холодно - тёмно-фиолетовый
+    } else if (temp < -10) {
+        return '#0047ab';  // Очень холодно - кобальтовый синий
+    } else if (temp < 0) {
+        return '#2E86C1';  // Холодно - синий
+    } else if (temp < 10) {
+        return '#5DADE2';  // Прохладно - голубой
+    } else if (temp < 15) {
+        return '#27AE60';  // Комфортно - зелёный
+    } else if (temp < 20) {
+        return '#82E0AA';  // Тепло - светло-зелёный
+    } else if (temp < 25) {
+        return '#F39C12';  // Тепло - оранжевый
+    } else if (temp < 30) {
+        return '#E74C3C';  // Жарко - красный
+    } else {
+        return '#943126';  // Очень жарко - тёмно-красный
+    }
+}
+
+/**
+ * Получить фон для температурной метки
+ * @param {number} temp - Температура в градусах Цельсия
+ * @returns {string} RGBA цвет фона
+ */
+function получитьФонТемпературы(temp) {
+    if (temp < 0) {
+        return 'rgba(46, 134, 193, 0.15)';  // Синеватый фон для холода
+    } else if (temp < 15) {
+        return 'rgba(39, 174, 96, 0.15)';  // Зеленоватый для комфорта
+    } else if (temp < 25) {
+        return 'rgba(243, 156, 18, 0.15)';  // Оранжевый для тепла
+    } else {
+        return 'rgba(231, 76, 60, 0.15)';  // Красноватый для жары
+    }
+}
+
+/**
+ * Создать SVG иконку термометра
+ * @param {string} цвет - Цвет термометра
+ * @returns {string} Data URI с SVG
+ */
+function создатьИконкуТермометра(цвет) {
+    const svg = `
+        <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <g>
+                <!-- Тело термометра -->
+                <rect x="10" y="3" width="4" height="13" rx="2" fill="${цвет}" stroke="white" stroke-width="1"/>
+                <!-- Резервуар -->
+                <circle cx="12" cy="18" r="4" fill="${цвет}" stroke="white" stroke-width="1"/>
+                <!-- Линии шкалы -->
+                <line x1="8" y1="6" x2="10" y2="6" stroke="white" stroke-width="0.5"/>
+                <line x1="8" y1="9" x2="10" y2="9" stroke="white" stroke-width="0.5"/>
+                <line x1="8" y1="12" x2="10" y2="12" stroke="white" stroke-width="0.5"/>
+            </g>
+        </svg>
+    `;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/**
+ * Создать слой текстовых подписей температуры (улучшенный)
  * @returns {ol.layer.Vector} Слой с текстовыми подписями
  */
 function создатьСлойТекстаТемпературы() {
@@ -26,54 +93,48 @@ function создатьСлойТекстаТемпературы() {
         source: labelsSource,
         style: function(feature) {
             const temperature = feature.get('temperature');
+            const цветТекста = получитьЦветТемпературы(temperature);
+            const фонЦвет = получитьФонТемпературы(temperature);
             
-            // Определяем цвет текста в зависимости от температуры
-            let textColor;
-            if (temperature < 0) {
-                textColor = '#0066cc';  // Синий для мороза
-            } else if (temperature < 10) {
-                textColor = '#4a90e2';  // Голубой для холода
-            } else if (temperature < 20) {
-                textColor = '#2c8c3f';  // Зелёный для комфорта
-            } else if (temperature < 25) {
-                textColor = '#f5a623';  // Оранжевый для тепла
-            } else {
-                textColor = '#d0021b';  // Красный для жары
-            }
+            // Форматируем температуру с знаком
+            const tempText = (temperature > 0 ? '+' : '') + temperature.toFixed(1) + '°';
             
-            return new ol.style.Style({
-                text: new ol.style.Text({
-                    text: temperature.toFixed(1) + '°C',
-                    font: 'bold 14px "Helvetica Neue", Arial, sans-serif',
-                    fill: new ol.style.Fill({
-                        color: textColor
-                    }),
-                    stroke: new ol.style.Stroke({
-                        color: '#ffffff',
-                        width: 3
-                    }),
-                    offsetY: -20,  // Сместить текст выше точки
-                    padding: [4, 6, 4, 6],
-                    backgroundFill: new ol.style.Fill({
-                        color: 'rgba(255, 255, 255, 0.85)'
-                    }),
-                    backgroundStroke: new ol.style.Stroke({
-                        color: 'rgba(0, 0, 0, 0.15)',
-                        width: 1
+            return [
+                // Стиль для текста с улучшенным фоном
+                new ol.style.Style({
+                    text: new ol.style.Text({
+                        text: tempText,
+                        font: 'bold 16px "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+                        fill: new ol.style.Fill({
+                            color: цветТекста
+                        }),
+                        stroke: new ol.style.Stroke({
+                            color: '#ffffff',
+                            width: 4
+                        }),
+                        offsetY: -8,  // Сместить текст выше иконки
+                        padding: [6, 8, 6, 8],
+                        backgroundFill: new ol.style.Fill({
+                            color: 'rgba(255, 255, 255, 0.95)'
+                        }),
+                        backgroundStroke: new ol.style.Stroke({
+                            color: цветТекста,
+                            width: 2
+                        })
                     })
                 }),
-                // Добавляем маленькую точку для привязки
-                image: new ol.style.Circle({
-                    radius: 3,
-                    fill: new ol.style.Fill({
-                        color: textColor
-                    }),
-                    stroke: new ol.style.Stroke({
-                        color: '#ffffff',
-                        width: 1
+                // Иконка термометра под текстом
+                new ol.style.Style({
+                    image: new ol.style.Icon({
+                        src: создатьИконкуТермометра(цветТекста),
+                        scale: 1.2,
+                        anchor: [0.5, 0.5],
+                        anchorXUnits: 'fraction',
+                        anchorYUnits: 'fraction',
+                        offsetY: 15
                     })
                 })
-            });
+            ];
         },
         // Показывать только при zoom > 10
         minZoom: 10,
@@ -81,7 +142,7 @@ function создатьСлойТекстаТемпературы() {
         visible: false  // По умолчанию скрыт
     });
     
-    console.log('[TemperatureLabels] Слой текстовых подписей создан');
+    console.log('[TemperatureLabels] Улучшенный слой текстовых подписей создан');
     return layer;
 }
 

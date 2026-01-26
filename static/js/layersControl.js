@@ -19,6 +19,11 @@ const activeLayers = {
         visible: false,
         opacity: 0.85,
         name: 'Векторное поле ветра (анимированное)'
+    },
+    windParticles: {
+        visible: false,
+        opacity: 1.0,
+        name: 'Потоки ветра (частицы)'
     }
 };
 
@@ -65,6 +70,19 @@ function инициализироватьУправлениеСлоями() {
         });
     } else {
         console.warn('[LayersControl] Wind checkbox not found!');
+    }
+    
+    // Чекбокс для потоков ветра (частицы)
+    const windParticlesCheckbox = document.getElementById('toggleWindParticles');
+    if (windParticlesCheckbox) {
+        console.log('[LayersControl] Found wind particles checkbox');
+        windParticlesCheckbox.checked = activeLayers.windParticles.visible;
+        windParticlesCheckbox.addEventListener('change', async function() {
+            console.log('[LayersControl] Wind particles checkbox changed:', this.checked);
+            await переключитьСлой('windParticles', this.checked);
+        });
+    } else {
+        console.warn('[LayersControl] Wind particles checkbox not found!');
     }
     
     // Слайдер прозрачности для температуры (если есть)
@@ -148,6 +166,20 @@ async function переключитьСлой(имяСлоя, состояние
                 console.log('[LayersControl] Wind toggle complete');
             } else {
                 console.error('[LayersControl] Cannot toggle wind - function or map missing');
+            }
+            break;
+            
+        case 'windParticles':
+            console.log('[LayersControl] Toggling wind particles layer...');
+            console.log('[LayersControl] Function переключитьЧастицыВетра exists?', typeof переключитьЧастицыВетра);
+            console.log('[LayersControl] Map object exists?', !!map);
+            
+            // Переключить частицы ветра (используем функцию из windParticles.js)
+            if (typeof переключитьЧастицыВетра === 'function' && map) {
+                await переключитьЧастицыВетра(map, состояние);
+                console.log('[LayersControl] Wind particles toggle complete');
+            } else {
+                console.error('[LayersControl] Cannot toggle wind particles - function or map missing');
             }
             break;
     }
