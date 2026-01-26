@@ -100,20 +100,20 @@ function создатьСлойТекстаТемпературы() {
             const tempText = (temperature > 0 ? '+' : '') + temperature.toFixed(1) + '°';
             
             return [
-                // Стиль для текста с улучшенным фоном
+                // Стиль для текста с улучшенным фоном (УВЕЛИЧЕННЫЙ)
                 new ol.style.Style({
                     text: new ol.style.Text({
                         text: tempText,
-                        font: 'bold 16px "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+                        font: 'bold 20px "Segoe UI", "Helvetica Neue", Arial, sans-serif',  // Увеличено с 16px до 20px
                         fill: new ol.style.Fill({
                             color: цветТекста
                         }),
                         stroke: new ol.style.Stroke({
                             color: '#ffffff',
-                            width: 4
+                            width: 5  // Увеличено с 4 до 5
                         }),
-                        offsetY: -8,  // Сместить текст выше иконки
-                        padding: [6, 8, 6, 8],
+                        offsetY: -12,  // Сместить текст выше иконки (было -8)
+                        padding: [8, 10, 8, 10],  // Увеличено
                         backgroundFill: new ol.style.Fill({
                             color: 'rgba(255, 255, 255, 0.95)'
                         }),
@@ -123,21 +123,21 @@ function создатьСлойТекстаТемпературы() {
                         })
                     })
                 }),
-                // Иконка термометра под текстом
+                // Иконка термометра под текстом (УВЕЛИЧЕННАЯ)
                 new ol.style.Style({
                     image: new ol.style.Icon({
                         src: создатьИконкуТермометра(цветТекста),
-                        scale: 1.2,
+                        scale: 1.5,  // Увеличено с 1.2 до 1.5
                         anchor: [0.5, 0.5],
                         anchorXUnits: 'fraction',
                         anchorYUnits: 'fraction',
-                        offsetY: 15
+                        offsetY: 18  // Увеличено с 15 до 18
                     })
                 })
             ];
         },
-        // Показывать только при zoom > 10
-        minZoom: 10,
+        // УБРАНО ограничение minZoom для отладки - показываем всегда
+        // minZoom: 10,
         opacity: 1.0,
         visible: false  // По умолчанию скрыт
     });
@@ -152,7 +152,7 @@ function создатьСлойТекстаТемпературы() {
  */
 async function загрузитьТекстыТемпературы(map) {
     try {
-        console.log('[TemperatureLabels] Loading temperature data...');
+        console.log('[TemperatureLabels] === НАЧАЛО ЗАГРУЗКИ ТЕМПЕРАТУРЫ ===');
         
         // Получаем границы видимой области карты
         const view = map.getView();
@@ -163,7 +163,8 @@ async function загрузитьТекстыТемпературы(map) {
             'EPSG:4326'
         );
         
-        console.log('[TemperatureLabels] Map bounds:', { minLon, minLat, maxLon, maxLat });
+        console.log('[TemperatureLabels] Границы карты:', { minLon, minLat, maxLon, maxLat });
+        console.log('[TemperatureLabels] Текущий zoom:', view.getZoom());
         
         // Запрос к API (используем меньший grid_size для меньшего количества точек)
         const params = new URLSearchParams({
@@ -176,27 +177,40 @@ async function загрузитьТекстыТемпературы(map) {
         });
         
         const url = `/api/weather/map-grid?${params.toString()}`;
-        console.log('[TemperatureLabels] Fetching from:', url);
+        console.log('[TemperatureLabels] URL запроса:', url);
         
         const response = await fetch(url);
+        console.log('[TemperatureLabels] Статус ответа:', response.status, response.statusText);
         
         if (!response.ok) {
             throw new Error(`API error: ${response.status}`);
         }
         
         const данные = await response.json();
-        console.log('[TemperatureLabels] Received data:', данные);
+        console.log('[TemperatureLabels] Получены данные:', данные);
+        console.log('[TemperatureLabels] Количество точек:', данные.count);
+        
+        // Если нет данных - используем ТЕСТОВЫЕ данные для Москвы
+        if (!данные.data || данные.data.length === 0) {
+            console.warn('[TemperatureLabels] ⚠️ НЕТ ДАННЫХ! Используем тестовые данные для Москвы');
+            данные.data = создатьТестовыеДанныеТемпературы();
+            данные.count = данные.data.length;
+            показатьУведомление('⚠️ Используются тестовые данные температуры', 'warning');
+        }
+        
+        // Логируем первые 3 точки для проверки
+        console.log('[TemperatureLabels] Первые 3 точки:', данные.data.slice(0, 3));
         
         // Получаем источник данных слоя
         const source = temperatureLabelsLayer.getSource();
-        console.log('[TemperatureLabels] Layer source:', source);
+        console.log('[TemperatureLabels] Источник слоя:', source ? 'OK' : 'NULL');
         
         source.clear();
-        console.log('[TemperatureLabels] Source cleared');
+        console.log('[TemperatureLabels] Источник очищен');
         
         // Добавляем точки с текстовыми метками на карту
         let addedFeatures = 0;
-        данные.data.forEach(точка => {
+        данные.data.forEach((точка, индекс) => {
             const coords = ol.proj.fromLonLat([точка.lon, точка.lat]);
             const feature = new ol.Feature({
                 geometry: new ol.geom.Point(coords),
@@ -204,40 +218,73 @@ async function загрузитьТекстыТемпературы(map) {
             });
             source.addFeature(feature);
             addedFeatures++;
+            
+            // Логируем первую точку подробно
+            if (индекс === 0) {
+                console.log('[TemperatureLabels] Первая точка:', {
+                    исходные_координаты: [точка.lon, точка.lat],
+                    преобразованные_координаты: coords,
+                    температура: точка.value
+                });
+            }
         });
         
-        console.log(`[TemperatureLabels] Added ${addedFeatures} features to source`);
-        console.log(`[TemperatureLabels] Source now has ${source.getFeatures().length} features`);
-        console.log(`[TemperatureLabels] Layer visibility: ${temperatureLabelsLayer.getVisible()}`);
-        console.log(`[TemperatureLabels] Layer opacity: ${temperatureLabelsLayer.getOpacity()}`);
+        console.log(`[TemperatureLabels] ✅ Добавлено ${addedFeatures} features`);
+        console.log(`[TemperatureLabels] Всего в источнике: ${source.getFeatures().length} features`);
+        console.log(`[TemperatureLabels] Видимость слоя: ${temperatureLabelsLayer.getVisible()}`);
+        console.log(`[TemperatureLabels] Прозрачность слоя: ${temperatureLabelsLayer.getOpacity()}`);
+        console.log(`[TemperatureLabels] minZoom слоя: ${temperatureLabelsLayer.get('minZoom')}`);
         
         isTemperatureLabelsLoaded = true;
         
         // Показываем уведомление
-        показатьУведомление(`Загружено подписей температуры: ${данные.count}`, 'success');
+        показатьУведомление(`✅ Загружено ${данные.count} меток температуры`, 'success');
+        console.log('[TemperatureLabels] === ЗАГРУЗКА ЗАВЕРШЕНА ===');
         
     } catch (error) {
-        console.error('[TemperatureLabels] Loading error:', error);
-        показатьУведомление('Ошибка загрузки температуры', 'danger');
+        console.error('[TemperatureLabels] ❌ ОШИБКА при загрузке:', error);
+        console.error('[TemperatureLabels] Stack trace:', error.stack);
+        показатьУведомление('❌ Ошибка загрузки температуры', 'danger');
         isTemperatureLabelsLoaded = false;
     }
 }
 
 /**
- * Создать SVG стрелку для вектора ветра (увеличенная и улучшенная)
+ * Создать тестовые данные температуры для Москвы
+ * @returns {Array} Массив точек с координатами и температурой
+ */
+function создатьТестовыеДанныеТемпературы() {
+    console.log('[TemperatureLabels] Генерация тестовых данных...');
+    const тестовыеДанные = [
+        { lat: 55.7558, lon: 37.6173, value: 2.5 },   // Центр (Кремль)
+        { lat: 55.7500, lon: 37.5800, value: 1.8 },   // Запад
+        { lat: 55.7800, lon: 37.6500, value: 3.2 },   // Север
+        { lat: 55.7300, lon: 37.6500, value: 2.1 },   // Юг
+        { lat: 55.7600, lon: 37.7000, value: 2.8 },   // Восток
+        { lat: 55.7900, lon: 37.5500, value: 0.5 },   // Северо-запад
+        { lat: 55.7200, lon: 37.5700, value: 1.2 },   // Юго-запад
+        { lat: 55.7850, lon: 37.7100, value: 3.5 },   // Северо-восток
+        { lat: 55.7150, lon: 37.6800, value: 2.3 },   // Юго-восток
+    ];
+    console.log('[TemperatureLabels] Создано тестовых точек:', тестовыеДанные.length);
+    return тестовыеДанные;
+}
+
+/**
+ * Создать SVG стрелку для вектора ветра (БОЛЬШАЯ и выразительная)
  * @param {string} цвет - Цвет стрелки (hex)
  * @param {number} размер - Размер стрелки (базовый размер)
  * @returns {string} Data URI с SVG изображением стрелки
  */
-function создатьSVGСтрелку(цвет, размер = 48) {
+function создатьSVGСтрелку(цвет, размер = 64) {  // Увеличено с 48 до 64
     const svg = `
         <svg width="${размер}" height="${размер}" xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
-                    <feOffset dx="0" dy="1" result="offsetblur"/>
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+                    <feOffset dx="0" dy="2" result="offsetblur"/>
                     <feComponentTransfer>
-                        <feFuncA type="linear" slope="0.4"/>
+                        <feFuncA type="linear" slope="0.5"/>
                     </feComponentTransfer>
                     <feMerge>
                         <feMergeNode/>
@@ -245,22 +292,22 @@ function создатьSVGСтрелку(цвет, размер = 48) {
                     </feMerge>
                 </filter>
             </defs>
-            <!-- Основное тело стрелки -->
-            <path d="M ${размер/2} 4 L ${размер/2} ${размер-8}" 
-                  stroke="${цвет}" stroke-width="4" stroke-linecap="round" filter="url(#shadow)"/>
-            <!-- Наконечник стрелки (больше и выразительнее) -->
-            <path d="M ${размер/2} 4 L ${размер/2-8} 14 L ${размер/2} 10 L ${размер/2+8} 14 Z" 
-                  fill="${цвет}" stroke="white" stroke-width="1.5" filter="url(#shadow)"/>
-            <!-- Хвост стрелки -->
-            <path d="M ${размер/2-6} ${размер-8} L ${размер/2} ${размер-8} L ${размер/2+6} ${размер-8}" 
-                  stroke="${цвет}" stroke-width="3" stroke-linecap="round"/>
+            <!-- Основное тело стрелки (толще) -->
+            <path d="M ${размер/2} 6 L ${размер/2} ${размер-10}" 
+                  stroke="${цвет}" stroke-width="6" stroke-linecap="round" filter="url(#shadow)"/>
+            <!-- Наконечник стрелки (БОЛЬШЕ И ВЫРАЗИТЕЛЬНЕЕ) -->
+            <path d="M ${размер/2} 6 L ${размер/2-12} 20 L ${размер/2} 14 L ${размер/2+12} 20 Z" 
+                  fill="${цвет}" stroke="white" stroke-width="2" filter="url(#shadow)"/>
+            <!-- Хвост стрелки (шире) -->
+            <path d="M ${размер/2-8} ${размер-10} L ${размер/2} ${размер-10} L ${размер/2+8} ${размер-10}" 
+                  stroke="${цвет}" stroke-width="4" stroke-linecap="round"/>
         </svg>
     `;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 
 /**
- * Создать стиль для стрелки ветра (улучшенный с большими размерами)
+ * Создать стиль для стрелки ветра (БОЛЬШИЕ стрелки с улучшенной анимацией)
  * @param {number} speed - Скорость ветра (м/с)
  * @param {number} direction - Направление ветра (градусы)
  * @param {number} animationPhase - Фаза анимации (0-1) для эффекта пульсации
@@ -268,43 +315,44 @@ function создатьSVGСтрелку(цвет, размер = 48) {
  */
 function создатьСтильСтрелкиВетра(speed, direction, animationPhase = 0) {
     // Определяем цвет, размер и масштаб на основе скорости ветра (по шкале Бофорта)
+    // УВЕЛИЧЕНЫ ВСЕ РАЗМЕРЫ
     let цвет, базовыйРазмер, масштаб;
     
     if (speed < 1) {
         // Штиль
         цвет = '#d0d0d0';
-        базовыйРазмер = 36;
-        масштаб = 0.6;
+        базовыйРазмер = 48;  // Было 36
+        масштаб = 0.8;       // Было 0.6
     } else if (speed < 3) {
         // Легкий ветер
         цвет = '#74add1';  
-        базовыйРазмер = 40;
-        масштаб = 0.7;
+        базовыйРазмер = 52;  // Было 40
+        масштаб = 0.9;       // Было 0.7
     } else if (speed < 6) {
         // Слабый ветер
         цвет = '#4575b4';
-        базовыйРазмер = 44;
-        масштаб = 0.8;
+        базовыйРазмер = 56;  // Было 44
+        масштаб = 1.0;       // Было 0.8
     } else if (speed < 10) {
         // Умеренный ветер
         цвет = '#fdae61';
-        базовыйРазмер = 48;
-        масштаб = 0.9;
+        базовыйРазмер = 60;  // Было 48
+        масштаб = 1.1;       // Было 0.9
     } else if (speed < 15) {
         // Свежий ветер
         цвет = '#f46d43';
-        базовыйРазмер = 52;
-        масштаб = 1.0;
+        базовыйРазмер = 64;  // Было 52
+        масштаб = 1.2;       // Было 1.0
     } else {
         // Сильный ветер
         цвет = '#d73027';
-        базовыйРазмер = 56;
-        масштаб = 1.1;
+        базовыйРазмер = 68;  // Было 56
+        масштаб = 1.3;       // Было 1.1
     }
     
-    // Добавляем эффект пульсации через изменение масштаба
+    // Добавляем УСИЛЕННЫЙ эффект пульсации через изменение масштаба
     // animationPhase изменяется от 0 до 1, создаём синусоиду для плавности
-    const пульсация = 1 + Math.sin(animationPhase * Math.PI * 2) * 0.1;  // ±10% от базового масштаба
+    const пульсация = 1 + Math.sin(animationPhase * Math.PI * 2) * 0.15;  // ±15% от базового масштаба (было ±10%)
     масштаб *= пульсация;
     
     // Конвертируем направление в радианы
@@ -317,8 +365,8 @@ function создатьСтильСтрелкиВетра(speed, direction, anim
     // Создаём SVG стрелку с динамическим размером
     const arrowSvg = создатьSVGСтрелку(цвет, базовыйРазмер);
     
-    // Вычисляем прозрачность для анимации "мерцания"
-    const прозрачность = 0.75 + Math.sin(animationPhase * Math.PI * 2) * 0.15;  // 0.6-0.9
+    // Вычисляем прозрачность для УСИЛЕННОЙ анимации "мерцания"
+    const прозрачность = 0.7 + Math.sin(animationPhase * Math.PI * 2) * 0.2;  // 0.5-0.9 (было 0.6-0.9)
     
     return new ol.style.Style({
         image: new ol.style.Icon({
@@ -400,7 +448,7 @@ function остановитьАнимациюВетра() {
  */
 async function загрузитьВекторыВетра(map) {
     try {
-        console.log('[Wind] Loading wind vectors...');
+        console.log('[Wind] === НАЧАЛО ЗАГРУЗКИ ВЕКТОРОВ ВЕТРА ===');
         
         // Получаем границы видимой области
         const view = map.getView();
@@ -411,7 +459,8 @@ async function загрузитьВекторыВетра(map) {
             'EPSG:4326'
         );
         
-        console.log('[Wind] Map bounds:', { minLon, minLat, maxLon, maxLat });
+        console.log('[Wind] Границы карты:', { minLon, minLat, maxLon, maxLat });
+        console.log('[Wind] Текущий zoom:', view.getZoom());
         
         // Запрос к API
         const params = new URLSearchParams({
@@ -419,31 +468,44 @@ async function загрузитьВекторыВетра(map) {
             max_lat: maxLat.toFixed(4),
             min_lon: minLon.toFixed(4),
             max_lon: maxLon.toFixed(4),
-            grid_size: 12
+            grid_size: 10  // Уменьшено с 12 до 10 для лучшей видимости больших стрелок
         });
         
         const url = `/api/weather/wind-vectors?${params.toString()}`;
-        console.log('[Wind] Fetching from:', url);
+        console.log('[Wind] URL запроса:', url);
         
         const response = await fetch(url);
+        console.log('[Wind] Статус ответа:', response.status, response.statusText);
         
         if (!response.ok) {
             throw new Error(`API error: ${response.status}`);
         }
         
         const данные = await response.json();
-        console.log('[Wind] Received data:', данные);
+        console.log('[Wind] Получены данные:', данные);
+        console.log('[Wind] Количество векторов:', данные.count);
+        
+        // Если нет данных - используем ТЕСТОВЫЕ данные для Москвы
+        if (!данные.data || данные.data.length === 0) {
+            console.warn('[Wind] ⚠️ НЕТ ДАННЫХ! Используем тестовые данные для Москвы');
+            данные.data = создатьТестовыеДанныеВетра();
+            данные.count = данные.data.length;
+            показатьУведомление('⚠️ Используются тестовые данные ветра', 'warning');
+        }
+        
+        // Логируем первые 3 вектора для проверки
+        console.log('[Wind] Первые 3 вектора:', данные.data.slice(0, 3));
         
         // Получаем источник данных слоя
         const source = windVectorsLayer.getSource();
-        console.log('[Wind] Layer source:', source);
+        console.log('[Wind] Источник слоя:', source ? 'OK' : 'NULL');
         
         source.clear();
-        console.log('[Wind] Source cleared');
+        console.log('[Wind] Источник очищен');
         
         // Добавляем векторы на карту
         let addedFeatures = 0;
-        данные.data.forEach(вектор => {
+        данные.data.forEach((вектор, индекс) => {
             const coords = ol.proj.fromLonLat([вектор.lon, вектор.lat]);
             const feature = new ol.Feature({
                 geometry: new ol.geom.Point(coords),
@@ -452,23 +514,56 @@ async function загрузитьВекторыВетра(map) {
             });
             source.addFeature(feature);
             addedFeatures++;
+            
+            // Логируем первый вектор подробно
+            if (индекс === 0) {
+                console.log('[Wind] Первый вектор:', {
+                    исходные_координаты: [вектор.lon, вектор.lat],
+                    преобразованные_координаты: coords,
+                    скорость: вектор.speed,
+                    направление: вектор.direction
+                });
+            }
         });
         
-        console.log(`[Wind] Added ${addedFeatures} features to source`);
-        console.log(`[Wind] Source now has ${source.getFeatures().length} features`);
-        console.log(`[Wind] Layer visibility: ${windVectorsLayer.getVisible()}`);
-        console.log(`[Wind] Layer opacity: ${windVectorsLayer.getOpacity()}`);
+        console.log(`[Wind] ✅ Добавлено ${addedFeatures} features`);
+        console.log(`[Wind] Всего в источнике: ${source.getFeatures().length} features`);
+        console.log(`[Wind] Видимость слоя: ${windVectorsLayer.getVisible()}`);
+        console.log(`[Wind] Прозрачность слоя: ${windVectorsLayer.getOpacity()}`);
         
         isWindVectorsLoaded = true;
         
         // Показываем уведомление
-        показатьУведомление(`Wind vectors loaded: ${данные.count} vectors`, 'success');
+        показатьУведомление(`✅ Загружено ${данные.count} векторов ветра`, 'success');
+        console.log('[Wind] === ЗАГРУЗКА ЗАВЕРШЕНА ===');
         
     } catch (error) {
-        console.error('[Wind] Loading error:', error);
-        показатьУведомление('Wind vectors loading error', 'danger');
+        console.error('[Wind] ❌ ОШИБКА при загрузке:', error);
+        console.error('[Wind] Stack trace:', error.stack);
+        показатьУведомление('❌ Ошибка загрузки ветра', 'danger');
         isWindVectorsLoaded = false;
     }
+}
+
+/**
+ * Создать тестовые данные ветра для Москвы
+ * @returns {Array} Массив векторов с координатами, скоростью и направлением
+ */
+function создатьТестовыеДанныеВетра() {
+    console.log('[Wind] Генерация тестовых данных...');
+    const тестовыеДанные = [
+        { lat: 55.7558, lon: 37.6173, speed: 5.2, direction: 270 },   // Центр - западный ветер
+        { lat: 55.7500, lon: 37.5800, speed: 4.8, direction: 290 },   // Запад
+        { lat: 55.7800, lon: 37.6500, speed: 6.1, direction: 240 },   // Север
+        { lat: 55.7300, lon: 37.6500, speed: 3.5, direction: 300 },   // Юг
+        { lat: 55.7600, lon: 37.7000, speed: 7.2, direction: 260 },   // Восток
+        { lat: 55.7900, lon: 37.5500, speed: 2.8, direction: 310 },   // Северо-запад
+        { lat: 55.7200, lon: 37.5700, speed: 4.2, direction: 280 },   // Юго-запад
+        { lat: 55.7850, lon: 37.7100, speed: 8.5, direction: 250 },   // Северо-восток
+        { lat: 55.7150, lon: 37.6800, speed: 5.8, direction: 290 },   // Юго-восток
+    ];
+    console.log('[Wind] Создано тестовых векторов:', тестовыеДанные.length);
+    return тестовыеДанные;
 }
 
 /**
@@ -476,35 +571,46 @@ async function загрузитьВекторыВетра(map) {
  * @param {ol.Map} map - Экземпляр карты OpenLayers
  */
 function инициализироватьПогодныеСлои(map) {
-    console.log('[WeatherLayers] Starting initialization...');
-    console.log('[WeatherLayers] Map object:', map);
+    console.log('[WeatherLayers] ========================================');
+    console.log('[WeatherLayers] ИНИЦИАЛИЗАЦИЯ ПОГОДНЫХ СЛОЁВ');
+    console.log('[WeatherLayers] ========================================');
+    console.log('[WeatherLayers] Map object:', map ? '✅ OK' : '❌ NULL');
     
     // Создаем слои
+    console.log('[WeatherLayers] Создание температурного слоя...');
     temperatureLabelsLayer = создатьСлойТекстаТемпературы();
-    console.log('[WeatherLayers] Temperature labels layer created:', temperatureLabelsLayer);
+    console.log('[WeatherLayers] Температурный слой:', temperatureLabelsLayer ? '✅ Создан' : '❌ Ошибка');
     
+    console.log('[WeatherLayers] Создание слоя векторов ветра...');
     windVectorsLayer = создатьСлойВекторовВетра();
-    console.log('[WeatherLayers] Wind vectors layer created:', windVectorsLayer);
+    console.log('[WeatherLayers] Слой ветра:', windVectorsLayer ? '✅ Создан' : '❌ Ошибка');
     
     // Добавляем слои на карту (они будут скрыты по умолчанию)
+    console.log('[WeatherLayers] Добавление слоёв на карту...');
     map.addLayer(temperatureLabelsLayer);
-    console.log('[WeatherLayers] Temperature labels layer added to map');
+    console.log('[WeatherLayers] ✅ Температурный слой добавлен на карту');
     
     map.addLayer(windVectorsLayer);
-    console.log('[WeatherLayers] Wind vectors layer added to map');
+    console.log('[WeatherLayers] ✅ Слой ветра добавлен на карту');
     
     // Проверим, что слои действительно добавлены
     const allLayers = map.getLayers().getArray();
-    console.log('[WeatherLayers] Total layers on map:', allLayers.length);
-    console.log('[WeatherLayers] All layers:', allLayers);
+    console.log('[WeatherLayers] Всего слоёв на карте:', allLayers.length);
+    console.log('[WeatherLayers] Список всех слоёв:', allLayers.map((l, i) => `${i}: ${l.constructor.name}`));
     
     // Настроить tooltip для векторов ветра
+    console.log('[WeatherLayers] Настройка tooltip для ветра...');
     настроитьTooltipВетра(map);
+    console.log('[WeatherLayers] ✅ Tooltip настроен');
     
     // Запустить анимацию ветра
+    console.log('[WeatherLayers] Запуск анимации ветра...');
     запуститьАнимациюВетра();
+    console.log('[WeatherLayers] ✅ Анимация запущена');
     
-    console.log('[WeatherLayers] Weather layers initialized successfully');
+    console.log('[WeatherLayers] ========================================');
+    console.log('[WeatherLayers] ✅ ИНИЦИАЛИЗАЦИЯ ЗАВЕРШЕНА УСПЕШНО');
+    console.log('[WeatherLayers] ========================================');
 }
 
 /**
@@ -523,6 +629,10 @@ async function переключитьТекстыТемпературы(map, п�
     console.log('[TemperatureLabels] Layer object:', temperatureLabelsLayer);
     
     if (показать) {
+        // Проверяем текущий масштаб
+        const zoom = map.getView().getZoom();
+        console.log('[TemperatureLabels] Текущий zoom:', zoom);
+        
         // Загружаем данные, если еще не загружены
         if (!isTemperatureLabelsLoaded) {
             console.log('[TemperatureLabels] Data not loaded, loading now...');
@@ -531,10 +641,16 @@ async function переключитьТекстыТемпературы(map, п�
             console.log('[TemperatureLabels] Data already loaded');
         }
         
+        // Показываем слой (управление видимостью по zoom происходит в обработчике карты)
         temperatureLabelsLayer.setVisible(true);
-        console.log('[TemperatureLabels] Visibility set to true');
+        console.log('[TemperatureLabels] ✅ Visibility set to true');
         console.log('[TemperatureLabels] Current visibility:', temperatureLabelsLayer.getVisible());
         console.log('[TemperatureLabels] Current opacity:', temperatureLabelsLayer.getOpacity());
+        
+        // Информируем пользователя, если zoom не подходящий
+        if (zoom < 9 || zoom > 16) {
+            показатьУведомление('💡 Измените масштаб до 9-16 для просмотра температуры', 'info');
+        }
     } else {
         temperatureLabelsLayer.setVisible(false);
         console.log('[TemperatureLabels] Visibility set to false');
@@ -560,6 +676,10 @@ async function переключитьВекторыВетра(map, показа�
     console.log('[Wind] Layer object:', windVectorsLayer);
     
     if (показать) {
+        // Проверяем текущий масштаб
+        const zoom = map.getView().getZoom();
+        console.log('[Wind] Текущий zoom:', zoom);
+        
         // Загружаем данные, если еще не загружены
         if (!isWindVectorsLoaded) {
             console.log('[Wind] Data not loaded, loading now...');
@@ -568,14 +688,20 @@ async function переключитьВекторыВетра(map, показа�
             console.log('[Wind] Data already loaded');
         }
         
+        // Показываем слой (управление видимостью по zoom происходит в обработчике карты)
         windVectorsLayer.setVisible(true);
-        console.log('[Wind] Visibility set to true');
+        console.log('[Wind] ✅ Visibility set to true');
         console.log('[Wind] Current visibility:', windVectorsLayer.getVisible());
         console.log('[Wind] Current opacity:', windVectorsLayer.getOpacity());
         
         // Убедимся, что анимация запущена
         if (!windAnimationFrame) {
             запуститьАнимациюВетра();
+        }
+        
+        // Информируем пользователя, если zoom не подходящий
+        if (zoom < 9 || zoom > 14) {
+            показатьУведомление('💡 Измените масштаб до 9-14 для просмотра ветра', 'info');
         }
     } else {
         windVectorsLayer.setVisible(false);

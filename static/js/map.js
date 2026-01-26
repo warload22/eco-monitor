@@ -85,6 +85,46 @@ function initMap() {
     // Инициализировать погодные слои
     инициализироватьПогодныеСлои(map);
     
+    // Управление видимостью погодных слоёв в зависимости от масштаба (КРИТИЧНО!)
+    map.getView().on('change:resolution', function() {
+        const zoom = map.getView().getZoom();
+        console.log('[Map] Zoom изменился:', zoom);
+        
+        // Температурный слой: видим на zoom 9-16 (средние и крупные масштабы)
+        if (temperatureLabelsLayer) {
+            const shouldShowTemp = (zoom >= 9 && zoom <= 16);
+            const isChecked = document.getElementById('toggleTemperature')?.checked;
+            
+            if (isChecked) {
+                if (shouldShowTemp && !temperatureLabelsLayer.getVisible()) {
+                    console.log('[Map] Показываем температурный слой (zoom подходящий)');
+                    temperatureLabelsLayer.setVisible(true);
+                } else if (!shouldShowTemp && temperatureLabelsLayer.getVisible()) {
+                    console.log('[Map] Скрываем температурный слой (zoom не подходящий)');
+                    temperatureLabelsLayer.setVisible(false);
+                    показатьУведомление('Температура видна на масштабе 9-16', 'info');
+                }
+            }
+        }
+        
+        // Векторы ветра: видимы на zoom 9-14 (средние масштабы)
+        if (windVectorsLayer) {
+            const shouldShowWind = (zoom >= 9 && zoom <= 14);
+            const isChecked = document.getElementById('toggleWind')?.checked;
+            
+            if (isChecked) {
+                if (shouldShowWind && !windVectorsLayer.getVisible()) {
+                    console.log('[Map] Показываем векторы ветра (zoom подходящий)');
+                    windVectorsLayer.setVisible(true);
+                } else if (!shouldShowWind && windVectorsLayer.getVisible()) {
+                    console.log('[Map] Скрываем векторы ветра (zoom не подходящий)');
+                    windVectorsLayer.setVisible(false);
+                    показатьУведомление('Ветер виден на масштабе 9-14', 'info');
+                }
+            }
+        }
+    });
+    
     // Обработчик клика для маркеров
     map.on('click', function(event) {
         const feature = map.forEachFeatureAtPixel(event.pixel, function(feature) {
