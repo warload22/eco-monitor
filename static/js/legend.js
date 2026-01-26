@@ -95,32 +95,38 @@ function создатьЛегендуТепловойКарты() {
             <div class="legend-gradient-container">
                 <div class="legend-gradient" style="
                     background: linear-gradient(to right, 
-                        #0000ff 0%, 
-                        #00ffff 20%, 
-                        #00ff00 40%, 
-                        #ffff00 60%, 
-                        #ff9900 80%, 
-                        #ff0000 100%
+                        #313695 0%,
+                        #4575b4 10%,
+                        #74add1 20%,
+                        #abd9e9 30%,
+                        #e0f3f8 40%,
+                        #ffffbf 50%,
+                        #fee090 60%,
+                        #fdae61 70%,
+                        #f46d43 80%,
+                        #d73027 90%,
+                        #a50026 100%
                     );
-                    height: 20px;
-                    border-radius: 4px;
-                    margin-bottom: 5px;
+                    height: 24px;
+                    border-radius: 5px;
+                    margin-bottom: 8px;
+                    border: 1px solid #ddd;
                 "></div>
                 <div class="legend-gradient-labels" style="
                     display: flex;
                     justify-content: space-between;
                     font-size: 0.75rem;
+                    color: #666;
                 ">
-                    <span>-10°C</span>
-                    <span>0°C</span>
-                    <span>10°C</span>
-                    <span>20°C</span>
-                    <span>30°C</span>
+                    <span style="font-weight: 500;">10°C</span>
+                    <span style="font-weight: 500;">15°C</span>
+                    <span style="font-weight: 500;">20°C</span>
+                    <span style="font-weight: 500;">25°C</span>
                 </div>
             </div>
-            <p class="legend-description">
+            <p class="legend-description mt-2 mb-0">
                 <small class="text-muted">
-                    Интенсивность цвета показывает температуру воздуха
+                    💡 Цвета соответствуют температуре воздуха (метеорологическая шкала)
                 </small>
             </p>
         </div>
@@ -135,37 +141,45 @@ function создатьЛегендуВетра() {
     return `
         <div class="legend-section mb-3">
             <h6 class="legend-title">💨 Векторное поле ветра</h6>
-            <div class="legend-item">
-                <svg width="30" height="20" style="margin-right: 8px;">
-                    <polygon points="15,2 20,10 10,10" fill="#00ff00" stroke="#fff" stroke-width="1"/>
-                    <line x1="15" y1="10" x2="15" y2="18" stroke="#00ff00" stroke-width="2"/>
+            <div class="legend-item mb-2">
+                <svg width="24" height="24" style="margin-right: 10px;" viewBox="0 0 24 24">
+                    <polygon points="12,4 16,12 8,12" fill="#d0d0d0" stroke="#fff" stroke-width="2"/>
                 </svg>
-                <span class="legend-text">Слабый (&lt;3 м/с)</span>
+                <span class="legend-text">Штиль (&lt;1 м/с)</span>
             </div>
-            <div class="legend-item">
-                <svg width="30" height="20" style="margin-right: 8px;">
-                    <polygon points="15,2 20,10 10,10" fill="#ffff00" stroke="#fff" stroke-width="1"/>
-                    <line x1="15" y1="10" x2="15" y2="18" stroke="#ffff00" stroke-width="2"/>
+            <div class="legend-item mb-2">
+                <svg width="24" height="24" style="margin-right: 10px;" viewBox="0 0 24 24">
+                    <polygon points="12,4 16,12 8,12" fill="#74add1" stroke="#fff" stroke-width="2"/>
                 </svg>
-                <span class="legend-text">Умеренный (3-8 м/с)</span>
+                <span class="legend-text">Легкий (1-3 м/с)</span>
             </div>
-            <div class="legend-item">
-                <svg width="30" height="20" style="margin-right: 8px;">
-                    <polygon points="15,2 20,10 10,10" fill="#ff9900" stroke="#fff" stroke-width="1"/>
-                    <line x1="15" y1="10" x2="15" y2="18" stroke="#ff9900" stroke-width="2"/>
+            <div class="legend-item mb-2">
+                <svg width="24" height="24" style="margin-right: 10px;" viewBox="0 0 24 24">
+                    <polygon points="12,4 17,12 7,12" fill="#4575b4" stroke="#fff" stroke-width="2"/>
                 </svg>
-                <span class="legend-text">Сильный (8-15 м/с)</span>
+                <span class="legend-text">Слабый (3-6 м/с)</span>
             </div>
-            <div class="legend-item">
-                <svg width="30" height="20" style="margin-right: 8px;">
-                    <polygon points="15,2 20,10 10,10" fill="#ff0000" stroke="#fff" stroke-width="1"/>
-                    <line x1="15" y1="10" x2="15" y2="18" stroke="#ff0000" stroke-width="2"/>
+            <div class="legend-item mb-2">
+                <svg width="28" height="28" style="margin-right: 8px;" viewBox="0 0 28 28">
+                    <polygon points="14,4 19,14 9,14" fill="#fdae61" stroke="#fff" stroke-width="2"/>
                 </svg>
-                <span class="legend-text">Очень сильный (&gt;15 м/с)</span>
+                <span class="legend-text">Умеренный (6-10 м/с)</span>
             </div>
-            <p class="legend-description">
+            <div class="legend-item mb-2">
+                <svg width="30" height="30" style="margin-right: 6px;" viewBox="0 0 30 30">
+                    <polygon points="15,4 21,15 9,15" fill="#f46d43" stroke="#fff" stroke-width="2"/>
+                </svg>
+                <span class="legend-text">Свежий (10-15 м/с)</span>
+            </div>
+            <div class="legend-item mb-2">
+                <svg width="32" height="32" style="margin-right: 4px;" viewBox="0 0 32 32">
+                    <polygon points="16,4 23,16 9,16" fill="#d73027" stroke="#fff" stroke-width="2"/>
+                </svg>
+                <span class="legend-text">Сильный (&gt;15 м/с)</span>
+            </div>
+            <p class="legend-description mt-2 mb-0">
                 <small class="text-muted">
-                    Стрелка показывает направление, цвет и длина - скорость ветра
+                    🧭 Стрелка указывает направление ветра. Размер и цвет отражают силу ветра (шкала Бофорта)
                 </small>
             </p>
         </div>
