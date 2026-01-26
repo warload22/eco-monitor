@@ -1,232 +1,109 @@
 /**
- * Модуль управления слоями карты
- * Управляет видимостью и прозрачностью всех слоёв на карте
+ * Модуль управления слоями карты (упрощённая версия)
+ * Управляет видимостью слоёв: станции, температура, ветер
  */
 
 // Глобальный объект для отслеживания состояния слоёв
 const activeLayers = {
     stations: {
         visible: true,
-        opacity: 1.0,
         name: 'Станции мониторинга'
     },
     temperature: {
         visible: false,
-        opacity: 1.0,
-        name: 'Температура (текстовые подписи)'
+        name: 'Температура воздуха'
     },
     wind: {
         visible: false,
-        opacity: 0.85,
-        name: 'Векторное поле ветра (анимированное)'
-    },
-    windParticles: {
-        visible: false,
-        opacity: 1.0,
-        name: 'Потоки ветра (частицы)'
+        name: 'Направление ветра'
     }
 };
 
 /**
  * Инициализировать управление слоями
- * Навешивает обработчики на все чекбоксы и слайдеры
+ * Навешивает обработчики на все чекбоксы
  */
 function инициализироватьУправлениеСлоями() {
-    console.log('[LayersControl] Initializing layers control...');
+    console.log('[LayersControl] Инициализация управления слоями...');
     
     // Чекбокс для станций мониторинга
     const stationsCheckbox = document.getElementById('toggleStations');
     if (stationsCheckbox) {
-        console.log('[LayersControl] Found stations checkbox');
         stationsCheckbox.checked = activeLayers.stations.visible;
         stationsCheckbox.addEventListener('change', function() {
             переключитьСлой('stations', this.checked);
         });
-    } else {
-        console.warn('[LayersControl] Stations checkbox not found!');
+        console.log('[LayersControl] ✓ Чекбокс станций настроен');
     }
     
-    // Чекбокс для текстовых подписей температуры
+    // Чекбокс для температуры
     const temperatureCheckbox = document.getElementById('toggleTemperature');
     if (temperatureCheckbox) {
-        console.log('[LayersControl] Found temperature checkbox');
         temperatureCheckbox.checked = activeLayers.temperature.visible;
         temperatureCheckbox.addEventListener('change', async function() {
-            console.log('[LayersControl] Temperature checkbox changed:', this.checked);
             await переключитьСлой('temperature', this.checked);
         });
-    } else {
-        console.warn('[LayersControl] Temperature checkbox not found!');
+        console.log('[LayersControl] ✓ Чекбокс температуры настроен');
     }
     
-    // Чекбокс для векторов ветра
+    // Чекбокс для ветра
     const windCheckbox = document.getElementById('toggleWind');
     if (windCheckbox) {
-        console.log('[LayersControl] Found wind checkbox');
         windCheckbox.checked = activeLayers.wind.visible;
         windCheckbox.addEventListener('change', async function() {
-            console.log('[LayersControl] Wind checkbox changed:', this.checked);
             await переключитьСлой('wind', this.checked);
         });
-    } else {
-        console.warn('[LayersControl] Wind checkbox not found!');
-    }
-    
-    // Чекбокс для потоков ветра (частицы)
-    const windParticlesCheckbox = document.getElementById('toggleWindParticles');
-    if (windParticlesCheckbox) {
-        console.log('[LayersControl] Found wind particles checkbox');
-        windParticlesCheckbox.checked = activeLayers.windParticles.visible;
-        windParticlesCheckbox.addEventListener('change', async function() {
-            console.log('[LayersControl] Wind particles checkbox changed:', this.checked);
-            await переключитьСлой('windParticles', this.checked);
-        });
-    } else {
-        console.warn('[LayersControl] Wind particles checkbox not found!');
-    }
-    
-    // Слайдер прозрачности для температуры (если есть)
-    const temperatureOpacitySlider = document.getElementById('temperatureOpacity');
-    if (temperatureOpacitySlider) {
-        console.log('[LayersControl] Found temperature opacity slider');
-        temperatureOpacitySlider.value = activeLayers.temperature.opacity;
-        temperatureOpacitySlider.addEventListener('input', function() {
-            изменитьПрозрачность('temperature', parseFloat(this.value));
-            updateOpacityLabel('temperatureOpacityValue', this.value);
-        });
-        updateOpacityLabel('temperatureOpacityValue', temperatureOpacitySlider.value);
-    }
-    
-    // Слайдер прозрачности для векторов ветра
-    const windOpacitySlider = document.getElementById('windOpacity');
-    if (windOpacitySlider) {
-        console.log('[LayersControl] Found wind opacity slider');
-        windOpacitySlider.value = activeLayers.wind.opacity;
-        windOpacitySlider.addEventListener('input', function() {
-            изменитьПрозрачность('wind', parseFloat(this.value));
-            updateOpacityLabel('windOpacityValue', this.value);
-        });
-        updateOpacityLabel('windOpacityValue', windOpacitySlider.value);
+        console.log('[LayersControl] ✓ Чекбокс ветра настроен');
     }
     
     // Кнопка сброса вида
     const resetViewButton = document.getElementById('resetMapView');
     if (resetViewButton) {
-        console.log('[LayersControl] Found reset view button');
         resetViewButton.addEventListener('click', сброситьВидКарты);
+        console.log('[LayersControl] ✓ Кнопка сброса настроена');
     }
     
-    console.log('[LayersControl] Layers control initialized successfully');
+    console.log('[LayersControl] ✅ Инициализация завершена');
 }
 
 /**
  * Переключить видимость слоя
- * @param {string} имяСлоя - Название слоя ('stations', 'heatmap', 'wind')
+ * @param {string} имяСлоя - Название слоя ('stations', 'temperature', 'wind')
  * @param {boolean} состояние - Включить (true) или выключить (false)
  */
 async function переключитьСлой(имяСлоя, состояние) {
-    console.log(`[LayersControl] Toggle layer "${имяСлоя}" to state: ${состояние}`);
+    console.log(`[LayersControl] Переключение слоя "${имяСлоя}": ${состояние}`);
     
     activeLayers[имяСлоя].visible = состояние;
     
     switch(имяСлоя) {
         case 'stations':
-            console.log('[LayersControl] Toggling stations layer...');
-            // Переключить видимость векторного слоя со станциями
-            if (vectorLayer) {
+            if (typeof vectorLayer !== 'undefined' && vectorLayer) {
                 vectorLayer.setVisible(состояние);
-                console.log('[LayersControl] Stations layer visibility set');
-            } else {
-                console.warn('[LayersControl] vectorLayer not found!');
+                console.log('[LayersControl] Станции:', состояние ? 'показаны' : 'скрыты');
             }
             break;
             
         case 'temperature':
-            console.log('[LayersControl] Toggling temperature labels layer...');
-            console.log('[LayersControl] Function переключитьТекстыТемпературы exists?', typeof переключитьТекстыТемпературы);
-            console.log('[LayersControl] Map object exists?', !!map);
-            
-            // Переключить текстовые подписи температуры (используем функцию из weatherLayers.js)
-            if (typeof переключитьТекстыТемпературы === 'function' && map) {
+            if (typeof переключитьТекстыТемпературы === 'function' && typeof map !== 'undefined') {
                 await переключитьТекстыТемпературы(map, состояние);
-                console.log('[LayersControl] Temperature labels toggle complete');
             } else {
-                console.error('[LayersControl] Cannot toggle temperature - function or map missing');
+                console.error('[LayersControl] Функция переключитьТекстыТемпературы не найдена');
             }
             break;
             
         case 'wind':
-            console.log('[LayersControl] Toggling wind layer...');
-            console.log('[LayersControl] Function переключитьВекторыВетра exists?', typeof переключитьВекторыВетра);
-            console.log('[LayersControl] Map object exists?', !!map);
-            
-            // Переключить векторы ветра (используем функцию из weatherLayers.js)
-            if (typeof переключитьВекторыВетра === 'function' && map) {
+            if (typeof переключитьВекторыВетра === 'function' && typeof map !== 'undefined') {
                 await переключитьВекторыВетра(map, состояние);
-                console.log('[LayersControl] Wind toggle complete');
             } else {
-                console.error('[LayersControl] Cannot toggle wind - function or map missing');
-            }
-            break;
-            
-        case 'windParticles':
-            console.log('[LayersControl] Toggling wind particles layer...');
-            console.log('[LayersControl] Function переключитьЧастицыВетра exists?', typeof переключитьЧастицыВетра);
-            console.log('[LayersControl] Map object exists?', !!map);
-            
-            // Переключить частицы ветра (используем функцию из windParticles.js)
-            if (typeof переключитьЧастицыВетра === 'function' && map) {
-                await переключитьЧастицыВетра(map, состояние);
-                console.log('[LayersControl] Wind particles toggle complete');
-            } else {
-                console.error('[LayersControl] Cannot toggle wind particles - function or map missing');
+                console.error('[LayersControl] Функция переключитьВекторыВетра не найдена');
             }
             break;
     }
     
     // Обновить легенду
     if (typeof обновитьЛегенду === 'function') {
-        console.log('[LayersControl] Updating legend...');
         обновитьЛегенду();
-    } else {
-        console.warn('[LayersControl] Legend update function not found');
-    }
-}
-
-/**
- * Изменить прозрачность слоя
- * @param {string} имяСлоя - Название слоя ('temperature', 'wind')
- * @param {number} значение - Значение прозрачности (0.0 - 1.0)
- */
-function изменитьПрозрачность(имяСлоя, значение) {
-    console.log(`Изменение прозрачности слоя "${имяСлоя}" на ${значение}`);
-    
-    activeLayers[имяСлоя].opacity = значение;
-    
-    switch(имяСлоя) {
-        case 'temperature':
-            if (temperatureLabelsLayer) {
-                temperatureLabelsLayer.setOpacity(значение);
-            }
-            break;
-            
-        case 'wind':
-            if (windVectorsLayer) {
-                windVectorsLayer.setOpacity(значение);
-            }
-            break;
-    }
-}
-
-/**
- * Обновить отображение значения прозрачности рядом со слайдером
- * @param {string} elementId - ID элемента для отображения значения
- * @param {number} value - Значение прозрачности
- */
-function updateOpacityLabel(elementId, value) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.textContent = `${Math.round(value * 100)}%`;
     }
 }
 
@@ -235,25 +112,25 @@ function updateOpacityLabel(elementId, value) {
  * Центрирует карту на Москве и устанавливает zoom = 10
  */
 function сброситьВидКарты() {
-    if (!map) {
-        console.error('Карта не инициализирована');
+    if (typeof map === 'undefined' || !map) {
+        console.error('[LayersControl] Карта не инициализирована');
         return;
     }
     
-    console.log('Сброс вида карты...');
+    console.log('[LayersControl] Сброс вида карты...');
     
     // Координаты Москвы
     const moscowCoords = [37.6173, 55.7558];
     const moscowCoordsProjected = ol.proj.fromLonLat(moscowCoords);
     
-    // Анимированный переход к новому виду
+    // Анимированный переход
     map.getView().animate({
         center: moscowCoordsProjected,
         zoom: 10,
-        duration: 1000
+        duration: 800
     });
     
-    console.log('Вид карты сброшен');
+    console.log('[LayersControl] ✅ Вид сброшен');
 }
 
 /**
@@ -271,3 +148,5 @@ function получитьСостояниеСлоёв() {
 function получитьАктивныеСлои() {
     return Object.keys(activeLayers).filter(key => activeLayers[key].visible);
 }
+
+console.log('[LayersControl] Модуль загружен');

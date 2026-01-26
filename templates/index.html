@@ -140,51 +140,29 @@
                         </div>
                     </div>
                     
-                    <!-- Текстовые подписи температуры -->
+                    <!-- Температура -->
                     <div class="mb-3 pb-3 border-bottom">
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" id="toggleTemperature">
                             <label class="form-check-label" for="toggleTemperature">
-                                🌡️ Температура (текстовые подписи)
+                                🌡️ Температура воздуха
                             </label>
                         </div>
-                        <div class="opacity-control ms-4">
-                            <label for="temperatureOpacity" class="form-label small mb-1">
-                                Прозрачность: <span id="temperatureOpacityValue">100%</span>
-                            </label>
-                            <input type="range" class="form-range" id="temperatureOpacity" 
-                                   min="0" max="1" step="0.1" value="1.0">
-                        </div>
+                        <small class="text-muted ms-4 d-block">
+                            Цветные маркеры по 10 точкам Москвы
+                        </small>
                     </div>
                     
-                    <!-- Векторное поле ветра -->
+                    <!-- Ветер -->
                     <div class="mb-3 pb-3 border-bottom">
                         <div class="form-check mb-2">
                             <input class="form-check-input" type="checkbox" id="toggleWind">
                             <label class="form-check-label" for="toggleWind">
-                                💨 Векторное поле ветра
-                            </label>
-                        </div>
-                        <div class="opacity-control ms-4">
-                            <label for="windOpacity" class="form-label small mb-1">
-                                Прозрачность: <span id="windOpacityValue">80%</span>
-                            </label>
-                            <input type="range" class="form-range" id="windOpacity" 
-                                   min="0" max="1" step="0.1" value="0.8">
-                        </div>
-                    </div>
-                    
-                    <!-- Потоки ветра (частицы) -->
-                    <div class="mb-3 pb-3 border-bottom">
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="toggleWindParticles">
-                            <label class="form-check-label" for="toggleWindParticles">
-                                🌊 Потоки ветра (анимация)
+                                💨 Направление ветра
                             </label>
                         </div>
                         <small class="text-muted ms-4 d-block">
-                            Плавная визуализация потоков<br>
-                            <em>Работает на больших масштабах</em>
+                            Анимированные стрелки по 10 точкам
                         </small>
                     </div>
                     
@@ -230,7 +208,6 @@
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/i18n/ru.js') }}"></script>
 <script src="{{ url_for('static', filename='js/weatherLayers.js') }}"></script>
-<script src="{{ url_for('static', filename='js/windParticles.js') }}"></script>
 <script src="{{ url_for('static', filename='js/legend.js') }}"></script>
 <script src="{{ url_for('static', filename='js/layersControl.js') }}"></script>
 <script src="{{ url_for('static', filename='js/map.js') }}"></script>
