@@ -1,6 +1,6 @@
 /**
- * Filter handling for map view
- * Manages user interactions with filter controls
+ * Обработка фильтров для карты
+ * Управляет взаимодействием пользователя с элементами управления фильтрами
  */
 
 /**
@@ -20,15 +20,17 @@ async function загрузитьПараметры() {
         // Очистить текущие опции
         selectElement.innerHTML = '<option value="">Все параметры</option>';
         
-        // Добавить параметры из API
+        // Добавить параметры из API (используем русифицированное имя, если есть)
         параметры.forEach(param => {
             const option = document.createElement('option');
             option.value = param.id;
-            option.textContent = `${param.name} (${param.unit})`;
+            // Используем name_ru, если доступно, иначе name
+            const displayName = param.name_ru || param.name;
+            option.textContent = `${displayName} (${param.unit})`;
             selectElement.appendChild(option);
         });
         
-        console.log(`Загружено ${параметры.length} параметр(ов)`);
+        console.log(t ? t('console.parametersLoaded', {count: параметры.length}) : `Загружено ${параметры.length} параметр(ов)`);
     } catch (error) {
         console.error('Ошибка загрузки параметров:', error);
         const selectElement = document.getElementById('parameterSelect');
@@ -64,7 +66,7 @@ async function загрузитьЛокации() {
             selectElement.appendChild(option);
         });
         
-        console.log(`Загружено ${локации.length} локаци(й)`);
+        console.log(t ? t('console.locationsLoaded', {count: локации.length}) : `Загружено ${локации.length} локаци(й)`);
     } catch (error) {
         console.error('Ошибка загрузки локаций:', error);
         const selectElement = document.getElementById('locationSelect');
@@ -73,7 +75,7 @@ async function загрузитьЛокации() {
 }
 
 /**
- * Apply filters button click handler
+ * Обработчик клика на кнопку применения фильтров
  */
 document.getElementById('applyFilters').addEventListener('click', function() {
     const filters = {
@@ -86,7 +88,7 @@ document.getElementById('applyFilters').addEventListener('click', function() {
 });
 
 /**
- * Reset filters button click handler
+ * Обработчик клика на кнопку сброса фильтров
  */
 document.getElementById('resetFilters').addEventListener('click', function() {
     resetFilters();
@@ -102,25 +104,25 @@ document.addEventListener('DOMContentLoaded', async function() {
         загрузитьЛокации()
     ]);
     
-    console.log('Фильтры успешно инициализированы');
+    console.log(t ? t('console.filtersInitialized') : 'Фильтры успешно инициализированы');
 });
 
 /**
- * Auto-refresh functionality (optional)
- * Uncomment to enable auto-refresh every 5 minutes
+ * Функция автообновления (опционально)
+ * Раскомментируйте для включения автообновления каждые 5 минут
  */
 /*
 setInterval(function() {
-    console.log('Auto-refreshing map data...');
+    console.log('Автообновление данных карты...');
     loadMeasurements();
-}, 5 * 60 * 1000); // 5 minutes
+}, 5 * 60 * 1000); // 5 минут
 */
 
 /**
- * Keyboard shortcuts
+ * Клавиатурные сокращения
  */
 document.addEventListener('keydown', function(event) {
-    // Ctrl+R or Cmd+R - Refresh data (prevent default browser reload)
+    // Ctrl+R или Cmd+R - Обновить данные (предотвращаем перезагрузку браузера по умолчанию)
     if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
         event.preventDefault();
         loadMeasurements();

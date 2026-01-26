@@ -229,14 +229,39 @@ def получить_все_параметры() -> List[Dict[str, Any]]:
     
     результаты = execute_query(запрос)
     
+    # Словарь переводов названий параметров
+    переводы_параметров = {
+        'PM2.5': 'Твердые частицы PM2.5',
+        'PM10': 'Твердые частицы PM10',
+        'NO2': 'Диоксид азота',
+        'SO2': 'Диоксид серы',
+        'CO': 'Угарный газ',
+        'O3': 'Озон',
+        'temperature': 'Температура воздуха',
+        'humidity': 'Влажность',
+        'pressure': 'Атмосферное давление',
+        'wind_speed': 'Скорость ветра',
+        'wind_direction': 'Направление ветра'
+    }
+    
+    переводы_категорий = {
+        'качество_воздуха': 'Качество воздуха',
+        'air_quality': 'Качество воздуха',
+        'weather': 'Погода',
+        'radiation': 'Радиация',
+        'noise': 'Шум'
+    }
+    
     return [
         {
             'id': строка['id'],
             'name': строка['name'],
+            'name_ru': переводы_параметров.get(строка['name'], строка['name']),
             'unit': строка['unit'],
             'description': строка['description'],
             'safe_limit': float(строка['safe_limit']) if строка['safe_limit'] else None,
-            'category': строка.get('category')
+            'category': строка.get('category'),
+            'category_ru': переводы_категорий.get(строка.get('category'), строка.get('category'))
         }
         for строка in результаты
     ]

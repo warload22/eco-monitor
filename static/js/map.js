@@ -1,6 +1,6 @@
 /**
- * Map initialization and management for EcoMonitor
- * Uses OpenLayers for interactive map visualization
+ * Инициализация и управление картой для EcoMonitor
+ * Использует OpenLayers для интерактивной визуализации карты
  */
 
 let map = null;
@@ -15,28 +15,28 @@ let currentFilters = {
 let isLoading = false;
 
 /**
- * Initialize OpenLayers map
+ * Инициализировать карту OpenLayers
  */
 function initMap() {
-    // Create popup overlay element
+    // Создать элемент всплывающего окна
     const popupElement = document.createElement('div');
     popupElement.id = 'popup';
     popupElement.className = 'ol-popup';
     document.body.appendChild(popupElement);
     
-    // Create popup closer button
+    // Создать кнопку закрытия всплывающего окна
     const popupCloser = document.createElement('a');
     popupCloser.href = '#';
     popupCloser.className = 'ol-popup-closer';
     popupCloser.innerHTML = '×';
     popupElement.appendChild(popupCloser);
     
-    // Create popup content container
+    // Создать контейнер для содержимого всплывающего окна
     const popupContent = document.createElement('div');
     popupContent.id = 'popup-content';
     popupElement.appendChild(popupContent);
     
-    // Create popup overlay
+    // Создать оверлей для всплывающего окна
     popupOverlay = new ol.Overlay({
         element: popupElement,
         autoPan: {
@@ -46,33 +46,33 @@ function initMap() {
         }
     });
     
-    // Popup closer handler
+    // Обработчик закрытия всплывающего окна
     popupCloser.onclick = function() {
         popupOverlay.setPosition(undefined);
         popupCloser.blur();
         return false;
     };
     
-    // Create vector source and layer for markers
+    // Создать векторный источник и слой для маркеров
     vectorSource = new ol.source.Vector();
     
     vectorLayer = new ol.layer.Vector({
         source: vectorSource
     });
     
-    // Center on Moscow (longitude, latitude in EPSG:4326)
+    // Центрировать на Москве (долгота, широта в EPSG:4326)
     const moscowCoords = [37.6173, 55.7558];
     const moscowCoordsProjected = ol.proj.fromLonLat(moscowCoords);
     
-    // Create map
+    // Создать карту
     map = new ol.Map({
         target: 'map',
         layers: [
-            // OpenStreetMap tile layer
+            // Слой OpenStreetMap
             new ol.layer.Tile({
                 source: new ol.source.OSM()
             }),
-            // Vector layer for markers
+            // Векторный слой для маркеров
             vectorLayer
         ],
         overlays: [popupOverlay],
@@ -82,7 +82,10 @@ function initMap() {
         })
     });
     
-    // Click handler for markers
+    // Инициализировать погодные слои
+    инициализироватьПогодныеСлои(map);
+    
+    // Обработчик клика для маркеров
     map.on('click', function(event) {
         const feature = map.forEachFeatureAtPixel(event.pixel, function(feature) {
             return feature;
@@ -92,14 +95,16 @@ function initMap() {
             const coordinates = feature.getGeometry().getCoordinates();
             const props = feature.get('properties');
             
-            popupContent.innerHTML = createPopupContent(props);
-            popupOverlay.setPosition(coordinates);
+            if (props) {
+                popupContent.innerHTML = createPopupContent(props);
+                popupOverlay.setPosition(coordinates);
+            }
         } else {
             popupOverlay.setPosition(undefined);
         }
     });
     
-    // Change cursor on hover
+    // Изменить курсор при наведении
     map.on('pointermove', function(event) {
         const pixel = map.getEventPixel(event.originalEvent);
         const hit = map.hasFeatureAtPixel(pixel);
@@ -112,12 +117,17 @@ function initMap() {
         }
     });
     
-    // Load initial data
+    // Настроить обработчики для переключения погодных слоев
+    setupWeatherLayersControls();
+    
+    // Загрузить начальные данные
     loadMeasurements();
+    
+    console.log(t ? t('console.mapInitialized') : 'Карта инициализирована');
 }
 
 /**
- * Show loading indicator
+ * Показать индикатор загрузки
  */
 function showLoadingIndicator() {
     isLoading = true;
@@ -129,7 +139,7 @@ function showLoadingIndicator() {
 }
 
 /**
- * Hide loading indicator
+ * Скрыть индикатор загрузки
  */
 function hideLoadingIndicator() {
     isLoading = false;
@@ -141,20 +151,40 @@ function hideLoadingIndicator() {
 }
 
 /**
- * Load measurements from API and display on map
+ * Настроить обработчики для управления погодными слоями
+ */
+function setupWeatherLayersControls() {
+    const heatmapCheckbox = document.getElementById('toggleHeatmap');
+    const windCheckbox = document.getElementById('toggleWindVectors');
+    
+    if (heatmapCheckbox) {
+        heatmapCheckbox.addEventListener('change', async function() {
+            await переключитьТепловуюКарту(map, this.checked);
+        });
+    }
+    
+    if (windCheckbox) {
+        windCheckbox.addEventListener('change', async function() {
+            await переключитьВекторыВетра(map, this.checked);
+        });
+    }
+}
+
+/**
+ * Загрузить измерения из API и отобразить на карте
  */
 async function loadMeasurements() {
-    // Prevent concurrent requests
+    // Предотвратить одновременные запросы
     if (isLoading) {
-        console.log('Request already in progress, skipping...');
+        console.log(t ? t('console.requestInProgress') : 'Запрос уже выполняется, пропускаем...');
         return;
     }
     
     try {
-        // Show loading indicator
+        // Показать индикатор загрузки
         showLoadingIndicator();
         
-        // Build query parameters
+        // Построить параметры запроса
         const params = new URLSearchParams();
         
         if (currentFilters.parameter_id) {
@@ -168,11 +198,11 @@ async function loadMeasurements() {
         // Добавить временной фильтр (часы), если нужно
         // API пока не поддерживает hours, но можем добавить для будущего расширения
         
-        // Fetch data from API
+        // Получить данные из API
         const response = await fetch(`/api/measurements?${params.toString()}`);
         
         if (!response.ok) {
-            throw new Error('Failed to fetch measurements');
+            throw new Error('Не удалось получить измерения');
         }
         
         const geojson = await response.json();
@@ -185,54 +215,54 @@ async function loadMeasurements() {
             popupOverlay.setPosition(undefined);
         }
         
-        // Add markers for each feature
+        // Добавить маркеры для каждой точки
         if (geojson.features && geojson.features.length > 0) {
             geojson.features.forEach(feature => {
                 addMarkerToMap(feature);
             });
             
-            // Update station count
+            // Обновить счетчик станций
             updateStationCount(geojson.features.length);
             
-            // Update last update time
+            // Обновить время последнего обновления
             updateLastUpdateTime();
             
-            console.log(`Loaded ${geojson.features.length} measurement(s)`);
+            console.log(t ? t('console.measurementsLoaded', {count: geojson.features.length}) : `Загружено ${geojson.features.length} измерени(й)`);
         } else {
-            console.log('No measurements found for current filters');
+            console.log(t ? t('console.noMeasurements') : 'Нет измерений для текущих фильтров');
             updateStationCount(0);
         }
         
     } catch (error) {
-        console.error('Error loading measurements:', error);
-        alert('Ошибка загрузки данных. Пожалуйста, попробуйте позже.');
+        console.error('Ошибка загрузки измерений:', error);
+        alert(t ? t('map.error') : 'Ошибка загрузки данных. Пожалуйста, попробуйте позже.');
     } finally {
-        // Hide loading indicator
+        // Скрыть индикатор загрузки
         hideLoadingIndicator();
     }
 }
 
 /**
- * Add marker to map for a measurement
+ * Добавить маркер на карту для измерения
  * @param {Object} feature - GeoJSON feature
  */
 function addMarkerToMap(feature) {
-    const coords = feature.geometry.coordinates; // [longitude, latitude]
+    const coords = feature.geometry.coordinates; // [долгота, широта]
     const props = feature.properties;
     
-    // Determine marker color based on safety
+    // Определить цвет маркера на основе безопасности
     const markerColor = getMarkerColor(props.value, props.safe_limit);
     
-    // Create point geometry (convert from EPSG:4326 to EPSG:3857)
+    // Создать геометрию точки (конвертировать из EPSG:4326 в EPSG:3857)
     const point = new ol.geom.Point(ol.proj.fromLonLat(coords));
     
-    // Create feature
+    // Создать feature
     const olFeature = new ol.Feature({
         geometry: point,
         properties: props
     });
     
-    // Create marker style
+    // Создать стиль маркера
     const markerStyle = new ol.style.Style({
         image: new ol.style.Circle({
             radius: 15,
@@ -248,38 +278,38 @@ function addMarkerToMap(feature) {
     
     olFeature.setStyle(markerStyle);
     
-    // Add to vector source
+    // Добавить в векторный источник
     vectorSource.addFeature(olFeature);
 }
 
 /**
- * Determine marker color based on value and safe limit
- * @param {number} value - Measured value
- * @param {number|null} safeLimit - Safe limit
- * @returns {string} - Hex color code
+ * Определить цвет маркера на основе значения и безопасного предела
+ * @param {number} value - Измеренное значение
+ * @param {number|null} safeLimit - Безопасный предел
+ * @returns {string} - Hex код цвета
  */
 function getMarkerColor(value, safeLimit) {
     if (!safeLimit) {
-        return '#6c757d'; // Gray for unknown
+        return '#6c757d'; // Серый для неизвестных
     }
     
     const ratio = value / safeLimit;
     
     if (ratio <= 0.5) {
-        return '#28a745'; // Green - Good
+        return '#28a745'; // Зеленый - Хорошо
     } else if (ratio <= 1.0) {
-        return '#ffc107'; // Yellow - Moderate
+        return '#ffc107'; // Желтый - Умеренно
     } else if (ratio <= 2.0) {
-        return '#fd7e14'; // Orange - Unhealthy
+        return '#fd7e14'; // Оранжевый - Нездорово
     } else {
-        return '#dc3545'; // Red - Dangerous
+        return '#dc3545'; // Красный - Опасно
     }
 }
 
 /**
- * Create popup content for marker
- * @param {Object} props - Feature properties
- * @returns {string} - HTML content
+ * Создать содержимое всплывающего окна для маркера
+ * @param {Object} props - Свойства feature
+ * @returns {string} - HTML содержимое
  */
 function createPopupContent(props) {
     // Определить статус
@@ -340,8 +370,8 @@ function createPopupContent(props) {
 }
 
 /**
- * Update station count display
- * @param {number} count - Number of stations
+ * Обновить отображение количества станций
+ * @param {number} count - Количество станций
  */
 function updateStationCount(count) {
     const stationCountElement = document.getElementById('stationCount');
@@ -351,7 +381,7 @@ function updateStationCount(count) {
 }
 
 /**
- * Update last update time display
+ * Обновить отображение времени последнего обновления
  */
 function updateLastUpdateTime() {
     const now = new Date();
@@ -370,8 +400,8 @@ function updateLastUpdateTime() {
 }
 
 /**
- * Apply filters and reload map
- * @param {Object} filters - Filter values
+ * Применить фильтры и перезагрузить карту
+ * @param {Object} filters - Значения фильтров
  */
 function applyFilters(filters) {
     currentFilters = { ...currentFilters, ...filters };
@@ -379,7 +409,7 @@ function applyFilters(filters) {
 }
 
 /**
- * Reset all filters
+ * Сбросить все фильтры
  */
 function resetFilters() {
     currentFilters = {
@@ -388,7 +418,7 @@ function resetFilters() {
         hours: 24
     };
     
-    // Reset form elements
+    // Сбросить элементы формы
     document.getElementById('parameterSelect').value = '';
     document.getElementById('locationSelect').value = '';
     document.getElementById('timeRange').value = '24';
@@ -396,7 +426,7 @@ function resetFilters() {
     loadMeasurements();
 }
 
-// Initialize map when page loads
+// Инициализировать карту при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
     initMap();
 });

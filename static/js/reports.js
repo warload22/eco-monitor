@@ -35,13 +35,14 @@ async function загрузитьПараметры() {
         // Очищаем селект
         select.innerHTML = '<option value="">Выберите параметр...</option>';
         
-        // Заполняем параметрами
+        // Заполняем параметрами (используем русифицированное имя, если доступно)
         параметры.forEach(param => {
             const option = document.createElement('option');
             option.value = param.id;
-            option.textContent = `${param.name} (${param.unit})`;
+            const displayName = param.name_ru || param.name;
+            option.textContent = `${displayName} (${param.unit})`;
             option.dataset.unit = param.unit;
-            option.dataset.name = param.name;
+            option.dataset.name = displayName;
             select.appendChild(option);
         });
         
