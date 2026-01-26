@@ -1,8 +1,9 @@
 """
 Map view blueprint - serves main map interface
 """
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, render_template, current_app, send_from_directory
 from database import execute_query
+import os
 
 bp = Blueprint('map_view', __name__)
 
@@ -28,3 +29,14 @@ def about():
         Rendered HTML template
     """
     return render_template('about.html')
+
+
+@bp.route('/test_layers.html')
+def test_layers():
+    """
+    Serve test layers page for debugging
+    
+    Returns:
+        HTML file
+    """
+    return send_from_directory('.', 'test_layers.html')

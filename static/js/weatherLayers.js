@@ -20,8 +20,8 @@ function создатьТепловуюКарту() {
     // Создаем слой тепловой карты
     const layer = new ol.layer.Heatmap({
         source: heatmapSource,
-        blur: 25,  // Размытие (больше = более плавный градиент)
-        radius: 20,  // Радиус влияния каждой точки
+        blur: 15,  // Размытие (меньше = более четкие пятна)
+        radius: 40,  // Радиус влияния каждой точки (увеличен для большей видимости)
         weight: function(feature) {
             // Вес точки влияет на интенсивность цвета
             // Нормализуем температуру к диапазону 0-1
@@ -52,7 +52,7 @@ function создатьТепловуюКарту() {
  */
 async function загрузитьТепловуюКарту(map) {
     try {
-        console.log('Загрузка данных тепловой карты...');
+        console.log('[Heatmap] Loading temperature data...');
         
         // Получаем границы видимой области карты
         const view = map.getView();
@@ -62,6 +62,8 @@ async function загрузитьТепловуюКарту(map) {
             'EPSG:3857', 
             'EPSG:4326'
         );
+        
+        console.log('[Heatmap] Map bounds:', { minLon, minLat, maxLon, maxLat });
         
         // Запрос к API
         const params = new URLSearchParams({
@@ -73,19 +75,27 @@ async function загрузитьТепловуюКарту(map) {
             grid_size: 20
         });
         
-        const response = await fetch(`/api/weather/map-grid?${params.toString()}`);
+        const url = `/api/weather/map-grid?${params.toString()}`;
+        console.log('[Heatmap] Fetching from:', url);
+        
+        const response = await fetch(url);
         
         if (!response.ok) {
-            throw new Error(`Ошибка API: ${response.status}`);
+            throw new Error(`API error: ${response.status}`);
         }
         
         const данные = await response.json();
+        console.log('[Heatmap] Received data:', данные);
         
         // Получаем источник данных слоя
         const source = heatmapLayer.getSource();
+        console.log('[Heatmap] Layer source:', source);
+        
         source.clear();
+        console.log('[Heatmap] Source cleared');
         
         // Добавляем точки на карту
+        let addedFeatures = 0;
         данные.data.forEach(точка => {
             const coords = ol.proj.fromLonLat([точка.lon, точка.lat]);
             const feature = new ol.Feature({
@@ -93,17 +103,22 @@ async function загрузитьТепловуюКарту(map) {
                 temperature: точка.value
             });
             source.addFeature(feature);
+            addedFeatures++;
         });
         
-        console.log(`Загружено ${данные.count} точек температурной сетки`);
+        console.log(`[Heatmap] Added ${addedFeatures} features to source`);
+        console.log(`[Heatmap] Source now has ${source.getFeatures().length} features`);
+        console.log(`[Heatmap] Layer visibility: ${heatmapLayer.getVisible()}`);
+        console.log(`[Heatmap] Layer opacity: ${heatmapLayer.getOpacity()}`);
+        
         isHeatmapLoaded = true;
         
         // Показываем уведомление
-        показатьУведомление(`Тепловая карта: загружено ${данные.count} точек`, 'success');
+        показатьУведомление(`Heatmap loaded: ${данные.count} points`, 'success');
         
     } catch (error) {
-        console.error('Ошибка загрузки тепловой карты:', error);
-        показатьУведомление('Ошибка загрузки тепловой карты', 'danger');
+        console.error('[Heatmap] Loading error:', error);
+        показатьУведомление('Heatmap loading error', 'danger');
         isHeatmapLoaded = false;
     }
 }
@@ -180,7 +195,7 @@ function создатьСлойВекторовВетра() {
  */
 async function загрузитьВекторыВетра(map) {
     try {
-        console.log('Загрузка векторов ветра...');
+        console.log('[Wind] Loading wind vectors...');
         
         // Получаем границы видимой области
         const view = map.getView();
@@ -191,6 +206,8 @@ async function загрузитьВекторыВетра(map) {
             'EPSG:4326'
         );
         
+        console.log('[Wind] Map bounds:', { minLon, minLat, maxLon, maxLat });
+        
         // Запрос к API
         const params = new URLSearchParams({
             min_lat: minLat.toFixed(4),
@@ -200,19 +217,27 @@ async function загрузитьВекторыВетра(map) {
             grid_size: 12
         });
         
-        const response = await fetch(`/api/weather/wind-vectors?${params.toString()}`);
+        const url = `/api/weather/wind-vectors?${params.toString()}`;
+        console.log('[Wind] Fetching from:', url);
+        
+        const response = await fetch(url);
         
         if (!response.ok) {
-            throw new Error(`Ошибка API: ${response.status}`);
+            throw new Error(`API error: ${response.status}`);
         }
         
         const данные = await response.json();
+        console.log('[Wind] Received data:', данные);
         
         // Получаем источник данных слоя
         const source = windVectorsLayer.getSource();
+        console.log('[Wind] Layer source:', source);
+        
         source.clear();
+        console.log('[Wind] Source cleared');
         
         // Добавляем векторы на карту
+        let addedFeatures = 0;
         данные.data.forEach(вектор => {
             const coords = ol.proj.fromLonLat([вектор.lon, вектор.lat]);
             const feature = new ol.Feature({
@@ -221,17 +246,22 @@ async function загрузитьВекторыВетра(map) {
                 direction: вектор.direction
             });
             source.addFeature(feature);
+            addedFeatures++;
         });
         
-        console.log(`Загружено ${данные.count} векторов ветра`);
+        console.log(`[Wind] Added ${addedFeatures} features to source`);
+        console.log(`[Wind] Source now has ${source.getFeatures().length} features`);
+        console.log(`[Wind] Layer visibility: ${windVectorsLayer.getVisible()}`);
+        console.log(`[Wind] Layer opacity: ${windVectorsLayer.getOpacity()}`);
+        
         isWindVectorsLoaded = true;
         
         // Показываем уведомление
-        показатьУведомление(`Векторы ветра: загружено ${данные.count} векторов`, 'success');
+        показатьУведомление(`Wind vectors loaded: ${данные.count} vectors`, 'success');
         
     } catch (error) {
-        console.error('Ошибка загрузки векторов ветра:', error);
-        показатьУведомление('Ошибка загрузки векторов ветра', 'danger');
+        console.error('[Wind] Loading error:', error);
+        показатьУведомление('Wind vectors loading error', 'danger');
         isWindVectorsLoaded = false;
     }
 }
@@ -241,18 +271,32 @@ async function загрузитьВекторыВетра(map) {
  * @param {ol.Map} map - Экземпляр карты OpenLayers
  */
 function инициализироватьПогодныеСлои(map) {
+    console.log('[WeatherLayers] Starting initialization...');
+    console.log('[WeatherLayers] Map object:', map);
+    
     // Создаем слои
     heatmapLayer = создатьТепловуюКарту();
+    console.log('[WeatherLayers] Heatmap layer created:', heatmapLayer);
+    
     windVectorsLayer = создатьСлойВекторовВетра();
+    console.log('[WeatherLayers] Wind vectors layer created:', windVectorsLayer);
     
     // Добавляем слои на карту (они будут скрыты по умолчанию)
     map.addLayer(heatmapLayer);
+    console.log('[WeatherLayers] Heatmap layer added to map');
+    
     map.addLayer(windVectorsLayer);
+    console.log('[WeatherLayers] Wind vectors layer added to map');
+    
+    // Проверим, что слои действительно добавлены
+    const allLayers = map.getLayers().getArray();
+    console.log('[WeatherLayers] Total layers on map:', allLayers.length);
+    console.log('[WeatherLayers] All layers:', allLayers);
     
     // Настроить tooltip для векторов ветра
     настроитьTooltipВетра(map);
     
-    console.log('Погодные слои инициализированы');
+    console.log('[WeatherLayers] Weather layers initialized successfully');
 }
 
 /**
@@ -261,21 +305,31 @@ function инициализироватьПогодныеСлои(map) {
  * @param {boolean} показать - Показать или скрыть слой
  */
 async function переключитьТепловуюКарту(map, показать) {
+    console.log(`[Heatmap] Toggle called with show=${показать}`);
+    
     if (!heatmapLayer) {
-        console.error('Тепловая карта не инициализирована');
+        console.error('[Heatmap] Layer not initialized!');
         return;
     }
+    
+    console.log('[Heatmap] Layer object:', heatmapLayer);
     
     if (показать) {
         // Загружаем данные, если еще не загружены
         if (!isHeatmapLoaded) {
+            console.log('[Heatmap] Data not loaded, loading now...');
             await загрузитьТепловуюКарту(map);
+        } else {
+            console.log('[Heatmap] Data already loaded');
         }
+        
         heatmapLayer.setVisible(true);
-        console.log('Тепловая карта показана');
+        console.log('[Heatmap] Visibility set to true');
+        console.log('[Heatmap] Current visibility:', heatmapLayer.getVisible());
+        console.log('[Heatmap] Current opacity:', heatmapLayer.getOpacity());
     } else {
         heatmapLayer.setVisible(false);
-        console.log('Тепловая карта скрыта');
+        console.log('[Heatmap] Visibility set to false');
     }
 }
 
@@ -285,21 +339,31 @@ async function переключитьТепловуюКарту(map, показ�
  * @param {boolean} показать - Показать или скрыть слой
  */
 async function переключитьВекторыВетра(map, показать) {
+    console.log(`[Wind] Toggle called with show=${показать}`);
+    
     if (!windVectorsLayer) {
-        console.error('Векторы ветра не инициализированы');
+        console.error('[Wind] Layer not initialized!');
         return;
     }
+    
+    console.log('[Wind] Layer object:', windVectorsLayer);
     
     if (показать) {
         // Загружаем данные, если еще не загружены
         if (!isWindVectorsLoaded) {
+            console.log('[Wind] Data not loaded, loading now...');
             await загрузитьВекторыВетра(map);
+        } else {
+            console.log('[Wind] Data already loaded');
         }
+        
         windVectorsLayer.setVisible(true);
-        console.log('Векторы ветра показаны');
+        console.log('[Wind] Visibility set to true');
+        console.log('[Wind] Current visibility:', windVectorsLayer.getVisible());
+        console.log('[Wind] Current opacity:', windVectorsLayer.getOpacity());
     } else {
         windVectorsLayer.setVisible(false);
-        console.log('Векторы ветра скрыты');
+        console.log('[Wind] Visibility set to false');
     }
 }
 

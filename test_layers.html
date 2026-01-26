@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Weather Layers - EcoMonitor</title>
+    
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.3.1/ol.css">
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 600px;
+        }
+        #controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        #console {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        button {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div id="controls">
+        <h4>Weather Layers Test</h4>
+        <button id="toggleHeatmap">Toggle Heatmap</button>
+        <button id="toggleWind">Toggle Wind Vectors</button>
+        <button id="testAPI">Test API</button>
+        <button id="clearConsole">Clear Console</button>
+    </div>
+    
+    <div id="console"></div>
+    
+    <!-- OpenLayers JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.3.1/dist/ol.js"></script>
+    
+    <script>
+        // Console logging
+        const consoleDiv = document.getElementById('console');
+        function log(message, color = '#0f0') {
+            const line = document.createElement('div');
+            line.style.color = color;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            consoleDiv.appendChild(line);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        // Redirect console.log to our div
+        const originalLog = console.log;
+        const originalError = console.error;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            log(args.join(' '), '#0f0');
+        };
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            log('ERROR: ' + args.join(' '), '#f00');
+        };
+        
+        log('Initializing map...');
+        
+        // Create map
+        const map = new ol.Map({
+            target: 'map',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.OSM()
+                })
+            ],
+            view: new ol.View({
+                center: ol.proj.fromLonLat([37.6173, 55.7558]),
+                zoom: 10
+            })
+        });
+        
+        log('Map created');
+        
+        // Create heatmap layer
+        const heatmapSource = new ol.source.Vector();
+        const heatmapLayer = new ol.layer.Heatmap({
+            source: heatmapSource,
+            blur: 25,
+            radius: 20,
+            weight: function(feature) {
+                const temp = feature.get('temperature');
+                return (temp + 10) / 40;  // Normalize -10 to 30°C to 0-1
+            },
+            gradient: ['#0000ff', '#00ffff', '#00ff00', '#ffff00', '#ff9900', '#ff0000'],
+            opacity: 0.6,
+            visible: false
+        });
+        
+        map.addLayer(heatmapLayer);
+        log('Heatmap layer created and added');
+        
+        // Create wind vectors layer
+        const windSource = new ol.source.Vector();
+        const windLayer = new ol.layer.Vector({
+            source: windSource,
+            style: function(feature) {
+                const speed = feature.get('speed');
+                const direction = feature.get('direction');
+                
+                let color;
+                if (speed < 3) color = '#00ff00';
+                else if (speed < 8) color = '#ffff00';
+                else if (speed < 15) color = '#ff9900';
+                else color = '#ff0000';
+                
+                const radians = (direction - 90) * Math.PI / 180;
+                
+                return new ol.style.Style({
+                    image: new ol.style.RegularShape({
+                        fill: new ol.style.Fill({ color: color }),
+                        stroke: new ol.style.Stroke({ color: '#ffffff', width: 1.5 }),
+                        points: 3,
+                        radius: 8,
+                        rotation: radians,
+                        angle: 0
+                    })
+                });
+            },
+            opacity: 0.8,
+            visible: false
+        });
+        
+        map.addLayer(windLayer);
+        log('Wind vectors layer created and added');
+        
+        // Load heatmap data
+        async function loadHeatmap() {
+            try {
+                log('Loading heatmap data...');
+                const response = await fetch('/api/weather/map-grid');
+                const data = await response.json();
+                
+                log(`Received ${data.count} heatmap points`);
+                
+                heatmapSource.clear();
+                data.data.forEach(point => {
+                    const coords = ol.proj.fromLonLat([point.lon, point.lat]);
+                    const feature = new ol.Feature({
+                        geometry: new ol.geom.Point(coords),
+                        temperature: point.value
+                    });
+                    heatmapSource.addFeature(feature);
+                });
+                
+                log(`Added ${heatmapSource.getFeatures().length} features to heatmap`);
+                log(`Heatmap visible: ${heatmapLayer.getVisible()}`);
+                log(`Heatmap opacity: ${heatmapLayer.getOpacity()}`);
+            } catch (error) {
+                console.error('Heatmap loading error:', error);
+            }
+        }
+        
+        // Load wind vectors
+        async function loadWind() {
+            try {
+                log('Loading wind vectors...');
+                const response = await fetch('/api/weather/wind-vectors');
+                const data = await response.json();
+                
+                log(`Received ${data.count} wind vectors`);
+                
+                windSource.clear();
+                data.data.forEach(vector => {
+                    const coords = ol.proj.fromLonLat([vector.lon, vector.lat]);
+                    const feature = new ol.Feature({
+                        geometry: new ol.geom.Point(coords),
+                        speed: vector.speed,
+                        direction: vector.direction
+                    });
+                    windSource.addFeature(feature);
+                });
+                
+                log(`Added ${windSource.getFeatures().length} features to wind layer`);
+                log(`Wind visible: ${windLayer.getVisible()}`);
+                log(`Wind opacity: ${windLayer.getOpacity()}`);
+            } catch (error) {
+                console.error('Wind loading error:', error);
+            }
+        }
+        
+        // Toggle buttons
+        document.getElementById('toggleHeatmap').addEventListener('click', async () => {
+            if (!heatmapLayer.getVisible()) {
+                await loadHeatmap();
+                heatmapLayer.setVisible(true);
+                log('Heatmap layer ENABLED');
+            } else {
+                heatmapLayer.setVisible(false);
+                log('Heatmap layer DISABLED');
+            }
+        });
+        
+        document.getElementById('toggleWind').addEventListener('click', async () => {
+            if (!windLayer.getVisible()) {
+                await loadWind();
+                windLayer.setVisible(true);
+                log('Wind layer ENABLED');
+            } else {
+                windLayer.setVisible(false);
+                log('Wind layer DISABLED');
+            }
+        });
+        
+        document.getElementById('testAPI').addEventListener('click', async () => {
+            log('Testing API endpoints...');
+            try {
+                const r1 = await fetch('/api/weather/map-grid');
+                const d1 = await r1.json();
+                log(`API /api/weather/map-grid: OK (${d1.count} points)`);
+                
+                const r2 = await fetch('/api/weather/wind-vectors');
+                const d2 = await r2.json();
+                log(`API /api/weather/wind-vectors: OK (${d2.count} vectors)`);
+            } catch (error) {
+                console.error('API test failed:', error);
+            }
+        });
+        
+        document.getElementById('clearConsole').addEventListener('click', () => {
+            consoleDiv.innerHTML = '';
+            log('Console cleared');
+        });
+        
+        log('All event listeners attached');
+        log('Ready! Click buttons to test layers.');
+    </script>
+</body>
+</html>

@@ -27,38 +27,50 @@ const activeLayers = {
  * Навешивает обработчики на все чекбоксы и слайдеры
  */
 function инициализироватьУправлениеСлоями() {
-    console.log('Инициализация управления слоями...');
+    console.log('[LayersControl] Initializing layers control...');
     
     // Чекбокс для станций мониторинга
     const stationsCheckbox = document.getElementById('toggleStations');
     if (stationsCheckbox) {
+        console.log('[LayersControl] Found stations checkbox');
         stationsCheckbox.checked = activeLayers.stations.visible;
         stationsCheckbox.addEventListener('change', function() {
             переключитьСлой('stations', this.checked);
         });
+    } else {
+        console.warn('[LayersControl] Stations checkbox not found!');
     }
     
     // Чекбокс для тепловой карты
     const heatmapCheckbox = document.getElementById('toggleHeatmap');
     if (heatmapCheckbox) {
+        console.log('[LayersControl] Found heatmap checkbox');
         heatmapCheckbox.checked = activeLayers.heatmap.visible;
         heatmapCheckbox.addEventListener('change', async function() {
+            console.log('[LayersControl] Heatmap checkbox changed:', this.checked);
             await переключитьСлой('heatmap', this.checked);
         });
+    } else {
+        console.warn('[LayersControl] Heatmap checkbox not found!');
     }
     
     // Чекбокс для векторов ветра
     const windCheckbox = document.getElementById('toggleWind');
     if (windCheckbox) {
+        console.log('[LayersControl] Found wind checkbox');
         windCheckbox.checked = activeLayers.wind.visible;
         windCheckbox.addEventListener('change', async function() {
+            console.log('[LayersControl] Wind checkbox changed:', this.checked);
             await переключитьСлой('wind', this.checked);
         });
+    } else {
+        console.warn('[LayersControl] Wind checkbox not found!');
     }
     
     // Слайдер прозрачности для тепловой карты
     const heatmapOpacitySlider = document.getElementById('heatmapOpacity');
     if (heatmapOpacitySlider) {
+        console.log('[LayersControl] Found heatmap opacity slider');
         heatmapOpacitySlider.value = activeLayers.heatmap.opacity;
         heatmapOpacitySlider.addEventListener('input', function() {
             изменитьПрозрачность('heatmap', parseFloat(this.value));
@@ -70,6 +82,7 @@ function инициализироватьУправлениеСлоями() {
     // Слайдер прозрачности для векторов ветра
     const windOpacitySlider = document.getElementById('windOpacity');
     if (windOpacitySlider) {
+        console.log('[LayersControl] Found wind opacity slider');
         windOpacitySlider.value = activeLayers.wind.opacity;
         windOpacitySlider.addEventListener('input', function() {
             изменитьПрозрачность('wind', parseFloat(this.value));
@@ -81,10 +94,11 @@ function инициализироватьУправлениеСлоями() {
     // Кнопка сброса вида
     const resetViewButton = document.getElementById('resetMapView');
     if (resetViewButton) {
-        resetViewButton.addEventListener('click', сбросить ВидКарты);
+        console.log('[LayersControl] Found reset view button');
+        resetViewButton.addEventListener('click', сброситьВидКарты);
     }
     
-    console.log('Управление слоями инициализировано');
+    console.log('[LayersControl] Layers control initialized successfully');
 }
 
 /**
@@ -93,36 +107,57 @@ function инициализироватьУправлениеСлоями() {
  * @param {boolean} состояние - Включить (true) или выключить (false)
  */
 async function переключитьСлой(имяСлоя, состояние) {
-    console.log(`Переключение слоя "${имяСлоя}" в состояние: ${состояние}`);
+    console.log(`[LayersControl] Toggle layer "${имяСлоя}" to state: ${состояние}`);
     
     activeLayers[имяСлоя].visible = состояние;
     
     switch(имяСлоя) {
         case 'stations':
+            console.log('[LayersControl] Toggling stations layer...');
             // Переключить видимость векторного слоя со станциями
             if (vectorLayer) {
                 vectorLayer.setVisible(состояние);
+                console.log('[LayersControl] Stations layer visibility set');
+            } else {
+                console.warn('[LayersControl] vectorLayer not found!');
             }
             break;
             
         case 'heatmap':
+            console.log('[LayersControl] Toggling heatmap layer...');
+            console.log('[LayersControl] Function переключитьТепловуюКарту exists?', typeof переключитьТепловуюКарту);
+            console.log('[LayersControl] Map object exists?', !!map);
+            
             // Переключить тепловую карту (используем функцию из weatherLayers.js)
             if (typeof переключитьТепловуюКарту === 'function' && map) {
                 await переключитьТепловуюКарту(map, состояние);
+                console.log('[LayersControl] Heatmap toggle complete');
+            } else {
+                console.error('[LayersControl] Cannot toggle heatmap - function or map missing');
             }
             break;
             
         case 'wind':
+            console.log('[LayersControl] Toggling wind layer...');
+            console.log('[LayersControl] Function переключитьВекторыВетра exists?', typeof переключитьВекторыВетра);
+            console.log('[LayersControl] Map object exists?', !!map);
+            
             // Переключить векторы ветра (используем функцию из weatherLayers.js)
             if (typeof переключитьВекторыВетра === 'function' && map) {
                 await переключитьВекторыВетра(map, состояние);
+                console.log('[LayersControl] Wind toggle complete');
+            } else {
+                console.error('[LayersControl] Cannot toggle wind - function or map missing');
             }
             break;
     }
     
     // Обновить легенду
     if (typeof обновитьЛегенду === 'function') {
+        console.log('[LayersControl] Updating legend...');
         обновитьЛегенду();
+    } else {
+        console.warn('[LayersControl] Legend update function not found');
     }
 }
 
@@ -167,7 +202,7 @@ function updateOpacityLabel(elementId, value) {
  * Сбросить вид карты к значениям по умолчанию
  * Центрирует карту на Москве и устанавливает zoom = 10
  */
-function сбросить ВидКарты() {
+function сброситьВидКарты() {
     if (!map) {
         console.error('Карта не инициализирована');
         return;
