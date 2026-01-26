@@ -36,6 +36,35 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload size
     JSON_AS_ASCII = False  # Support Cyrillic characters in JSON
     JSONIFY_PRETTYPRINT_REGULAR = DEBUG
+    
+    # Data sources configuration
+    # Конфигурация внешних источников данных
+    DATA_SOURCES_CONFIG = {
+        'openweathermap': {
+            'enabled': os.getenv('OPENWEATHERMAP_ENABLED', 'False').lower() == 'true',
+            'api_key': os.getenv('OPENWEATHERMAP_API_KEY', ''),
+            'base_url': 'https://api.openweathermap.org/data/2.5',
+            'timeout': 30
+        },
+        'iqair': {
+            'enabled': os.getenv('IQAIR_ENABLED', 'False').lower() == 'true',
+            'api_key': os.getenv('IQAIR_API_KEY', ''),
+            'base_url': 'https://api.airvisual.com/v2',
+            'timeout': 30
+        },
+        'gismeteo': {
+            'enabled': os.getenv('GISMETEO_ENABLED', 'False').lower() == 'true',
+            'api_key': os.getenv('GISMETEO_API_KEY', ''),
+            'base_url': 'https://api.gismeteo.net/v2',
+            'timeout': 30
+        },
+        # Добавляйте новые источники здесь
+    }
+    
+    # Logging configuration for data fetchers
+    # Конфигурация логирования сборщиков данных
+    FETCHER_LOG_FILE = os.getenv('FETCHER_LOG_FILE', 'logs/fetcher.log')
+    FETCHER_LOG_LEVEL = os.getenv('FETCHER_LOG_LEVEL', 'INFO')
 
 
 class DevelopmentConfig(Config):
