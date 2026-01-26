@@ -13,6 +13,7 @@ class ParameterOut(BaseModel):
     unit: str
     description: Optional[str] = None
     safe_limit: Optional[float] = None
+    category: Optional[str] = None  # Категория: 'качество_воздуха', 'погода', 'радиация', 'вода', 'шум'
     
     class Config:
         from_attributes = True
@@ -24,6 +25,8 @@ class MeasurementCreate(BaseModel):
     value: float = Field(..., ge=0, description="Значение измерения")
     latitude: float = Field(..., ge=-90, le=90, description="Широта")
     longitude: float = Field(..., ge=-180, le=180, description="Долгота")
+    source_id: Optional[int] = Field(None, gt=0, description="ID источника данных")
+    extra_data: Optional[dict] = Field(None, description="Дополнительные данные (JSON)")
     
     @field_validator('latitude', 'longitude')
     @classmethod
@@ -50,6 +53,9 @@ class MeasurementOut(BaseModel):
     measured_at: datetime
     created_at: datetime
     safe_limit: Optional[float] = None
+    category: Optional[str] = None  # Категория параметра
+    source_id: Optional[int] = None  # ID источника данных
+    extra_data: Optional[dict] = None  # Дополнительные данные
     
     class Config:
         from_attributes = True
@@ -82,6 +88,18 @@ class ParameterSchema(BaseModel):
     unit: str = Field(..., min_length=1, max_length=20)
     description: Optional[str] = None
     safe_limit: Optional[float] = Field(None, ge=0)
+    category: Optional[str] = Field(None, max_length=50)
+    
+    class Config:
+        from_attributes = True
+
+
+class DataSourceOut(BaseModel):
+    """Схема для вывода источника данных"""
+    id: int
+    name: str
+    url: Optional[str] = None
+    description: Optional[str] = None
     
     class Config:
         from_attributes = True

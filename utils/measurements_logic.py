@@ -67,7 +67,9 @@ def создать_измерение(
     parameter_id: int,
     value: float,
     latitude: float,
-    longitude: float
+    longitude: float,
+    source_id: Optional[int] = None,
+    extra_data: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Создать новое измерение
@@ -77,6 +79,8 @@ def создать_измерение(
         value: Значение измерения
         latitude: Широта
         longitude: Долгота
+        source_id: ID источника данных (опционально)
+        extra_data: Дополнительные данные в формате JSON (опционально)
         
     Returns:
         Словарь с данными созданного измерения
@@ -86,16 +90,20 @@ def создать_измерение(
     
     # Создаем измерение
     запрос = """
-        INSERT INTO measurements (location_id, parameter_id, value, measured_at)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO measurements (location_id, parameter_id, value, measured_at, source_id, extra_data)
+        VALUES (%s, %s, %s, %s, %s, %s)
         RETURNING id, created_at
     """
     
     текущее_время = datetime.utcnow()
     
+    # Преобразуем extra_data в JSON-строку для psycopg
+    import json
+    extra_data_json = json.dumps(extra_data) if extra_data else None
+    
     результат = execute_query(
         запрос,
-        (location_id, parameter_id, value, текущее_время),
+        (location_id, parameter_id, value, текущее_время, source_id, extra_data_json),
         fetch_one=True
     )
     
@@ -106,7 +114,9 @@ def создать_измерение(
         'latitude': latitude,
         'longitude': longitude,
         'measured_at': текущее_время,
-        'created_at': результат['created_at']
+        'created_at': результат['created_at'],
+        'source_id': source_id,
+        'extra_data': extra_data
     }
 
 
@@ -140,13 +150,16 @@ def получить_измерения_с_фильтрами(
             m.value,
             m.measured_at,
             m.created_at,
+            m.source_id,
+            m.extra_data,
             l.latitude,
             l.longitude,
             l.name as location_name,
             l.district,
             p.name as parameter_name,
             p.unit as parameter_unit,
-            p.safe_limit
+            p.safe_limit,
+            p.category
         FROM measurements m
         JOIN locations l ON m.location_id = l.id
         JOIN parameters p ON m.parameter_id = p.id
@@ -192,7 +205,10 @@ def получить_измерения_с_фильтрами(
             'district': строка.get('district'),
             'measured_at': строка['measured_at'],
             'created_at': строка['created_at'],
-            'safe_limit': float(строка['safe_limit']) if строка['safe_limit'] else None
+            'safe_limit': float(строка['safe_limit']) if строка['safe_limit'] else None,
+            'category': строка.get('category'),
+            'source_id': строка.get('source_id'),
+            'extra_data': строка.get('extra_data')
         })
     
     return измерения
@@ -206,9 +222,9 @@ def получить_все_параметры() -> List[Dict[str, Any]]:
         Список словарей с данными параметров
     """
     запрос = """
-        SELECT id, name, unit, description, safe_limit
+        SELECT id, name, unit, description, safe_limit, category
         FROM parameters
-        ORDER BY name
+        ORDER BY category, name
     """
     
     результаты = execute_query(запрос)
@@ -219,7 +235,8 @@ def получить_все_параметры() -> List[Dict[str, Any]]:
             'name': строка['name'],
             'unit': строка['unit'],
             'description': строка['description'],
-            'safe_limit': float(строка['safe_limit']) if строка['safe_limit'] else None
+            'safe_limit': float(строка['safe_limit']) if строка['safe_limit'] else None,
+            'category': строка.get('category')
         }
         for строка in результаты
     ]
@@ -421,7 +438,10 @@ def преобразовать_в_geojson(измерения: List[Dict[str, Any
                 'safe_limit': изм['safe_limit'],
                 'is_safe': безопасно,
                 'measured_at': изм['measured_at'].isoformat(),
-                'created_at': изм['created_at'].isoformat()
+                'created_at': изм['created_at'].isoformat(),
+                'category': изм.get('category'),
+                'source_id': изм.get('source_id'),
+                'extra_data': изм.get('extra_data')
             }
         }
         features.append(feature)

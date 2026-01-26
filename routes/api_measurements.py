@@ -105,7 +105,9 @@ def создать_новое_измерение():
             parameter_id=данные_измерения.parameter_id,
             value=данные_измерения.value,
             latitude=данные_измерения.latitude,
-            longitude=данные_измерения.longitude
+            longitude=данные_измерения.longitude,
+            source_id=данные_измерения.source_id,
+            extra_data=данные_измерения.extra_data
         )
         
         return jsonify({
