@@ -476,6 +476,148 @@ logger = logging.getLogger(__name__)
 
 ---
 
+## Реализованные сборщики
+
+### Open-Meteo Air Quality API
+
+**Статус:** ✅ Реализовано
+
+**Описание:** Бесплатный API для получения данных о качестве воздуха. Не требует ключа API.
+
+**Модуль:** `data_sources/air_quality/open_meteo_fetcher.py`
+
+**Покрытие:** Москва (55.7558, 37.6176)
+
+**Параметры:**
+- PM10 - Твердые частицы 10 микрон (мкг/м³)
+- PM2.5 - Твердые частицы 2.5 микрон (мкг/м³)
+- CO - Угарный газ (мг/м³)
+- NO2 - Диоксид азота (мкг/м³)
+- SO2 - Диоксид серы (мкг/м³)
+- O3 - Озон (мкг/м³)
+
+**Особенности:**
+- API возвращает почасовые данные за несколько дней
+- Сборщик извлекает последнее доступное значение для каждого параметра
+- Автоматическая конвертация единиц (CO: µg/m³ → мг/м³)
+- Временные метки в формате ISO8601 с автоматическим определением часового пояса
+
+**Пример ответа API:**
+
+```json
+{
+  "latitude": 55.75,
+  "longitude": 37.625,
+  "generationtime_ms": 1.234,
+  "utc_offset_seconds": 10800,
+  "timezone": "Europe/Moscow",
+  "hourly": {
+    "time": [
+      "2026-01-26T00:00",
+      "2026-01-26T01:00",
+      "2026-01-26T02:00"
+    ],
+    "pm10": [12.5, 13.2, 14.1],
+    "pm2_5": [8.3, 9.1, 9.8],
+    "carbon_monoxide": [245.0, 250.0, 255.0],
+    "nitrogen_dioxide": [18.5, 19.2, 20.1],
+    "sulphur_dioxide": [5.2, 5.5, 5.8],
+    "ozone": [45.0, 46.0, 47.0]
+  }
+}
+```
+
+**Логика парсинга:**
+
+```python
+# 1. API возвращает временные ряды (массивы значений по часам)
+hourly_data = response['hourly']
+time_series = hourly_data['pm10']  # [12.5, 13.2, 14.1, ...]
+timestamps = hourly_data['time']   # ["2026-01-26T00:00", ...]
+
+# 2. Извлекаем последнее не-null значение
+last_value = None
+last_timestamp = None
+for value, timestamp in reversed(zip(time_series, timestamps)):
+    if value is not None:
+        last_value = value
+        last_timestamp = timestamp
+        break
+
+# 3. Преобразуем в единый формат
+measurement = {
+    'parameter_name': 'PM10',
+    'category': 'качество_воздуха',
+    'value': last_value,
+    'unit': 'мкг/м³',
+    'latitude': 55.7558,
+    'longitude': 37.6176,
+    'timestamp': datetime.fromisoformat(last_timestamp),
+    'external_id': 'open_meteo_moscow'
+}
+```
+
+**Конфигурация:**
+
+В `config.py`:
+
+```python
+AIR_QUALITY_CONFIG = {
+    'open_meteo': {
+        'base_url': 'https://air-quality-api.open-meteo.com/v1/air-quality',
+        'latitude': 55.7558,  # Москва
+        'longitude': 37.6176,  # Москва
+        'params': ['pm10', 'pm2_5', 'carbon_monoxide', 
+                  'nitrogen_dioxide', 'sulphur_dioxide', 'ozone'],
+        'timeout': 30
+    }
+}
+```
+
+**Запуск:**
+
+```bash
+# Напрямую
+python data_sources/air_quality/open_meteo_fetcher.py
+
+# Через тестовый скрипт
+python test_open_meteo_fetcher.py
+
+# Через общий интерфейс
+python -c "from data_sources import запустить_сборщик; запустить_сборщик('air_quality')"
+```
+
+**Тестирование:**
+
+```bash
+# Запуск теста с детальным выводом
+python test_open_meteo_fetcher.py
+
+# Проверка данных в БД
+psql -d ecomonitor -c "SELECT * FROM measurements WHERE source_id IN 
+  (SELECT id FROM data_sources WHERE name LIKE '%Open-Meteo%') 
+  ORDER BY measured_at DESC LIMIT 10;"
+
+# Проверка через API
+curl "http://127.0.0.1:5000/api/measurements?category=качество_воздуха"
+```
+
+**URL для тестирования в браузере:**
+
+```
+https://air-quality-api.open-meteo.com/v1/air-quality?latitude=55.7558&longitude=37.6176&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto
+```
+
+**Источники данных:**
+- CAMS European Air Quality Forecast (11 км разрешение)
+- CAMS Global Atmospheric Composition Forecasts (25 км разрешение)
+
+**Обновление:** Каждые 12-24 часа (в зависимости от модели)
+
+**Документация:** https://open-meteo.com/en/docs/air-quality-api
+
+---
+
 ## Примеры использования
 
 ### Запуск всех сборщиков

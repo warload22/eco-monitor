@@ -61,6 +61,19 @@ class Config:
         # Добавляйте новые источники здесь
     }
     
+    # Air Quality Sources Configuration
+    # Конфигурация источников данных о качестве воздуха
+    AIR_QUALITY_CONFIG = {
+        'open_meteo': {
+            'base_url': 'https://air-quality-api.open-meteo.com/v1/air-quality',
+            'latitude': 55.7558,  # Москва
+            'longitude': 37.6176,  # Москва
+            'params': ['pm10', 'pm2_5', 'carbon_monoxide', 'nitrogen_dioxide', 
+                      'sulphur_dioxide', 'ozone'],
+            'timeout': 30
+        }
+    }
+    
     # Logging configuration for data fetchers
     # Конфигурация логирования сборщиков данных
     FETCHER_LOG_FILE = os.getenv('FETCHER_LOG_FILE', 'logs/fetcher.log')
