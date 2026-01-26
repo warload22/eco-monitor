@@ -20,8 +20,8 @@ function создатьТепловуюКарту() {
     // Создаем слой тепловой карты с улучшенной визуализацией
     const layer = new ol.layer.Heatmap({
         source: heatmapSource,
-        blur: 25,  // Увеличено размытие для более плавных переходов
-        radius: 30,  // Оптимальный радиус
+        blur: 70,  // Увеличено размытие для плавного градиента
+        radius: 80,  // Увеличен радиус для сплошного покрытия
         weight: function(feature) {
             // Вес точки влияет на интенсивность цвета
             // Нормализуем температуру к диапазону 0-1
@@ -37,20 +37,13 @@ function создатьТепловуюКарту() {
             return normalized;
         },
         gradient: [
-            // Градиент на основе метеорологических стандартов (как Windy.com, Ventusky.com)
-            '#313695',  // Темно-синий (очень холодно)
-            '#4575b4',  // Синий
-            '#74add1',  // Светло-синий  
-            '#abd9e9',  // Голубой
-            '#e0f3f8',  // Бледно-голубой
-            '#ffffbf',  // Желтовато-белый (нейтрально)
-            '#fee090',  // Светло-желтый
-            '#fdae61',  // Желто-оранжевый
-            '#f46d43',  // Оранжевый
-            '#d73027',  // Красно-оранжевый
-            '#a50026'   // Темно-красный (очень тепло)
+            '#0000ff',  // Синий (холодно)
+            '#00ffff',  // Голубой
+            '#00ff00',  // Зелёный (умеренно)
+            '#ffff00',  // Жёлтый
+            '#ff0000'   // Красный (тепло)
         ],
-        opacity: 0.5,  // Немного снижена для лучшей читаемости карты
+        opacity: 0.7,  // Повышена для лучшей видимости градиента
         visible: false  // По умолчанию скрыт
     });
     
@@ -135,59 +128,92 @@ async function загрузитьТепловуюКарту(map) {
 }
 
 /**
+ * Создать SVG стрелку для вектора ветра
+ * @param {string} цвет - Цвет стрелки (hex)
+ * @returns {string} Data URI с SVG изображением стрелки
+ */
+function создатьSVGСтрелку(цвет) {
+    const svg = `
+        <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="1"/>
+                    <feOffset dx="0" dy="1" result="offsetblur"/>
+                    <feComponentTransfer>
+                        <feFuncA type="linear" slope="0.3"/>
+                    </feComponentTransfer>
+                    <feMerge>
+                        <feMergeNode/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
+            <!-- Основное тело стрелки -->
+            <path d="M 16 2 L 16 24" stroke="${цвет}" stroke-width="3" stroke-linecap="round" filter="url(#shadow)"/>
+            <!-- Наконечник стрелки -->
+            <path d="M 16 2 L 10 10 L 16 8 L 22 10 Z" fill="${цвет}" stroke="white" stroke-width="1" filter="url(#shadow)"/>
+            <!-- Хвост стрелки -->
+            <path d="M 12 24 L 16 24 L 20 24" stroke="${цвет}" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+    `;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/**
  * Создать стиль для стрелки ветра
  * @param {number} speed - Скорость ветра (м/с)
  * @param {number} direction - Направление ветра (градусы)
  * @returns {ol.style.Style} Стиль для отображения вектора
  */
 function создатьСтильСтрелкиВетра(speed, direction) {
-    // Определяем цвет и размер на основе скорости ветра (по шкале Бофорта)
-    let цвет, размер;
+    // Определяем цвет и масштаб на основе скорости ветра (по шкале Бофорта)
+    let цвет, масштаб;
     
     if (speed < 1) {
         // Штиль
         цвет = '#d0d0d0';
-        размер = 6;
+        масштаб = 0.4;
     } else if (speed < 3) {
         // Легкий ветер
         цвет = '#74add1';  
-        размер = 8;
+        масштаб = 0.5;
     } else if (speed < 6) {
         // Слабый ветер
         цвет = '#4575b4';
-        размер = 10;
+        масштаб = 0.6;
     } else if (speed < 10) {
         // Умеренный ветер
         цвет = '#fdae61';
-        размер = 12;
+        масштаб = 0.7;
     } else if (speed < 15) {
         // Свежий ветер
         цвет = '#f46d43';
-        размер = 14;
+        масштаб = 0.85;
     } else {
         // Сильный ветер
         цвет = '#d73027';
-        размер = 16;
+        масштаб = 1.0;
     }
     
     // Конвертируем направление в радианы
-    // Метеорологическое направление: откуда дует ветер
-    // OpenLayers: 0° = восток, поворот против часовой стрелки
-    // Преобразование: метео 0°(север) -> OL 90°
-    const радианы = ((90 - direction) * Math.PI) / 180;
+    // Метеорологическое направление: откуда дует ветер (0° = северный ветер, дует С СЕВЕРА)
+    // Нужно показать, КУДА дует ветер, поэтому добавляем 180°
+    // OpenLayers: 0° = восток, поворот по часовой стрелке
+    // Преобразование: метео 0° (север) + 180° (разворот) - 90° (коррекция для OL) = 90°
+    const радианы = ((direction + 180 - 90) * Math.PI) / 180;
+    
+    // Создаём SVG стрелку
+    const arrowSvg = создатьSVGСтрелку(цвет);
     
     return new ol.style.Style({
-        image: new ol.style.RegularShape({
-            fill: new ol.style.Fill({ color: цвет }),
-            stroke: new ol.style.Stroke({ 
-                color: '#ffffff', 
-                width: 2 
-            }),
-            points: 3,  // Треугольник (стрелка)
-            radius: размер,
+        image: new ol.style.Icon({
+            src: arrowSvg,
+            scale: масштаб,
             rotation: радианы,
-            angle: 0,
-            rotateWithView: false  // Стрелка не вращается при повороте карты
+            rotateWithView: false,  // Стрелка не вращается при повороте карты
+            anchor: [0.5, 0.5],  // Центр изображения
+            anchorXUnits: 'fraction',
+            anchorYUnits: 'fraction'
         })
     });
 }
@@ -316,6 +342,9 @@ function инициализироватьПогодныеСлои(map) {
     const allLayers = map.getLayers().getArray();
     console.log('[WeatherLayers] Total layers on map:', allLayers.length);
     console.log('[WeatherLayers] All layers:', allLayers);
+    
+    // Настроить адаптацию тепловой карты к масштабу
+    настроитьАдаптациюТепловойКарты(map);
     
     // Настроить tooltip для векторов ветра
     настроитьTooltipВетра(map);
@@ -448,6 +477,52 @@ async function обновитьПогодныеСлои(map) {
         await Promise.all(обновления);
         console.log('Погодные слои обновлены');
     }
+}
+
+/**
+ * Настроить адаптацию тепловой карты к масштабу
+ * Динамически изменяет радиус и размытие в зависимости от зума
+ * @param {ol.Map} map - Экземпляр карты OpenLayers
+ */
+function настроитьАдаптациюТепловойКарты(map) {
+    const view = map.getView();
+    
+    // Функция пересчёта параметров тепловой карты
+    function обновитьПараметрыТепловойКарты() {
+        if (!heatmapLayer) return;
+        
+        const zoom = view.getZoom();
+        const resolution = view.getResolution();
+        
+        // Базовые значения для зума 10 (Москва целиком)
+        const baseZoom = 10;
+        const baseRadius = 80;
+        const baseBlur = 70;
+        
+        // Коэффициент изменения (экспоненциальная зависимость)
+        // При увеличении зума (приближении) - уменьшаем радиус
+        // При уменьшении зума (отдалении) - увеличиваем радиус
+        const zoomDiff = zoom - baseZoom;
+        const scaleFactor = Math.pow(0.8, zoomDiff);
+        
+        // Рассчитываем новые значения
+        const newRadius = Math.max(20, Math.min(150, baseRadius * scaleFactor));
+        const newBlur = Math.max(15, Math.min(120, baseBlur * scaleFactor));
+        
+        // Применяем новые параметры
+        heatmapLayer.setRadius(newRadius);
+        heatmapLayer.setBlur(newBlur);
+        
+        console.log(`[Heatmap] Zoom: ${zoom.toFixed(1)}, Resolution: ${resolution?.toFixed(2)}, Radius: ${newRadius.toFixed(1)}, Blur: ${newBlur.toFixed(1)}`);
+    }
+    
+    // Устанавливаем начальные параметры
+    обновитьПараметрыТепловойКарты();
+    
+    // Обработчик изменения масштаба
+    view.on('change:resolution', обновитьПараметрыТепловойКарты);
+    
+    console.log('[Heatmap] Адаптация к масштабу настроена');
 }
 
 /**
