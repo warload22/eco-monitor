@@ -10,15 +10,15 @@ const activeLayers = {
         opacity: 1.0,
         name: 'Станции мониторинга'
     },
-    heatmap: {
+    temperature: {
         visible: false,
-        opacity: 0.6,
-        name: 'Тепловая карта температуры'
+        opacity: 1.0,
+        name: 'Температура (текстовые подписи)'
     },
     wind: {
         visible: false,
-        opacity: 0.8,
-        name: 'Векторное поле ветра'
+        opacity: 0.85,
+        name: 'Векторное поле ветра (анимированное)'
     }
 };
 
@@ -41,17 +41,17 @@ function инициализироватьУправлениеСлоями() {
         console.warn('[LayersControl] Stations checkbox not found!');
     }
     
-    // Чекбокс для тепловой карты
-    const heatmapCheckbox = document.getElementById('toggleHeatmap');
-    if (heatmapCheckbox) {
-        console.log('[LayersControl] Found heatmap checkbox');
-        heatmapCheckbox.checked = activeLayers.heatmap.visible;
-        heatmapCheckbox.addEventListener('change', async function() {
-            console.log('[LayersControl] Heatmap checkbox changed:', this.checked);
-            await переключитьСлой('heatmap', this.checked);
+    // Чекбокс для текстовых подписей температуры
+    const temperatureCheckbox = document.getElementById('toggleTemperature');
+    if (temperatureCheckbox) {
+        console.log('[LayersControl] Found temperature checkbox');
+        temperatureCheckbox.checked = activeLayers.temperature.visible;
+        temperatureCheckbox.addEventListener('change', async function() {
+            console.log('[LayersControl] Temperature checkbox changed:', this.checked);
+            await переключитьСлой('temperature', this.checked);
         });
     } else {
-        console.warn('[LayersControl] Heatmap checkbox not found!');
+        console.warn('[LayersControl] Temperature checkbox not found!');
     }
     
     // Чекбокс для векторов ветра
@@ -67,16 +67,16 @@ function инициализироватьУправлениеСлоями() {
         console.warn('[LayersControl] Wind checkbox not found!');
     }
     
-    // Слайдер прозрачности для тепловой карты
-    const heatmapOpacitySlider = document.getElementById('heatmapOpacity');
-    if (heatmapOpacitySlider) {
-        console.log('[LayersControl] Found heatmap opacity slider');
-        heatmapOpacitySlider.value = activeLayers.heatmap.opacity;
-        heatmapOpacitySlider.addEventListener('input', function() {
-            изменитьПрозрачность('heatmap', parseFloat(this.value));
-            updateOpacityLabel('heatmapOpacityValue', this.value);
+    // Слайдер прозрачности для температуры (если есть)
+    const temperatureOpacitySlider = document.getElementById('temperatureOpacity');
+    if (temperatureOpacitySlider) {
+        console.log('[LayersControl] Found temperature opacity slider');
+        temperatureOpacitySlider.value = activeLayers.temperature.opacity;
+        temperatureOpacitySlider.addEventListener('input', function() {
+            изменитьПрозрачность('temperature', parseFloat(this.value));
+            updateOpacityLabel('temperatureOpacityValue', this.value);
         });
-        updateOpacityLabel('heatmapOpacityValue', heatmapOpacitySlider.value);
+        updateOpacityLabel('temperatureOpacityValue', temperatureOpacitySlider.value);
     }
     
     // Слайдер прозрачности для векторов ветра
@@ -123,17 +123,17 @@ async function переключитьСлой(имяСлоя, состояние
             }
             break;
             
-        case 'heatmap':
-            console.log('[LayersControl] Toggling heatmap layer...');
-            console.log('[LayersControl] Function переключитьТепловуюКарту exists?', typeof переключитьТепловуюКарту);
+        case 'temperature':
+            console.log('[LayersControl] Toggling temperature labels layer...');
+            console.log('[LayersControl] Function переключитьТекстыТемпературы exists?', typeof переключитьТекстыТемпературы);
             console.log('[LayersControl] Map object exists?', !!map);
             
-            // Переключить тепловую карту (используем функцию из weatherLayers.js)
-            if (typeof переключитьТепловуюКарту === 'function' && map) {
-                await переключитьТепловуюКарту(map, состояние);
-                console.log('[LayersControl] Heatmap toggle complete');
+            // Переключить текстовые подписи температуры (используем функцию из weatherLayers.js)
+            if (typeof переключитьТекстыТемпературы === 'function' && map) {
+                await переключитьТекстыТемпературы(map, состояние);
+                console.log('[LayersControl] Temperature labels toggle complete');
             } else {
-                console.error('[LayersControl] Cannot toggle heatmap - function or map missing');
+                console.error('[LayersControl] Cannot toggle temperature - function or map missing');
             }
             break;
             
@@ -163,7 +163,7 @@ async function переключитьСлой(имяСлоя, состояние
 
 /**
  * Изменить прозрачность слоя
- * @param {string} имяСлоя - Название слоя ('heatmap', 'wind')
+ * @param {string} имяСлоя - Название слоя ('temperature', 'wind')
  * @param {number} значение - Значение прозрачности (0.0 - 1.0)
  */
 function изменитьПрозрачность(имяСлоя, значение) {
@@ -172,9 +172,9 @@ function изменитьПрозрачность(имяСлоя, значени
     activeLayers[имяСлоя].opacity = значение;
     
     switch(имяСлоя) {
-        case 'heatmap':
-            if (heatmapLayer) {
-                heatmapLayer.setOpacity(значение);
+        case 'temperature':
+            if (temperatureLabelsLayer) {
+                temperatureLabelsLayer.setOpacity(значение);
             }
             break;
             

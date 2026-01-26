@@ -140,20 +140,20 @@
                         </div>
                     </div>
                     
-                    <!-- Тепловая карта температуры -->
+                    <!-- Текстовые подписи температуры -->
                     <div class="mb-3 pb-3 border-bottom">
                         <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" id="toggleHeatmap">
-                            <label class="form-check-label" for="toggleHeatmap">
-                                🌡️ Тепловая карта температуры
+                            <input class="form-check-input" type="checkbox" id="toggleTemperature">
+                            <label class="form-check-label" for="toggleTemperature">
+                                🌡️ Температура (текстовые подписи)
                             </label>
                         </div>
                         <div class="opacity-control ms-4">
-                            <label for="heatmapOpacity" class="form-label small mb-1">
-                                Прозрачность: <span id="heatmapOpacityValue">60%</span>
+                            <label for="temperatureOpacity" class="form-label small mb-1">
+                                Прозрачность: <span id="temperatureOpacityValue">100%</span>
                             </label>
-                            <input type="range" class="form-range" id="heatmapOpacity" 
-                                   min="0" max="1" step="0.1" value="0.6">
+                            <input type="range" class="form-range" id="temperatureOpacity" 
+                                   min="0" max="1" step="0.1" value="1.0">
                         </div>
                     </div>
                     
