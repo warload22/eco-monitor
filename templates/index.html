@@ -124,45 +124,74 @@
                 </button>
             </div>
             
-            <!-- Legend -->
-            <div class="legend">
-                <h6 class="mb-3">📊 Легенда</h6>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #28a745;"></div>
-                    <span>Норма</span>
+            <!-- Layers Control Panel -->
+            <div class="card mt-3" id="layers-panel">
+                <div class="card-header">
+                    <h6 class="mb-0">🗺️ Слои карты</h6>
                 </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #ffc107;"></div>
-                    <span>Умеренно</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #fd7e14;"></div>
-                    <span>Нездорово</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #dc3545;"></div>
-                    <span>Опасно</span>
+                <div class="card-body">
+                    <!-- Станции мониторинга -->
+                    <div class="mb-3 pb-3 border-bottom">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="toggleStations" checked>
+                            <label class="form-check-label" for="toggleStations">
+                                📊 Станции мониторинга
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Тепловая карта температуры -->
+                    <div class="mb-3 pb-3 border-bottom">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="toggleHeatmap">
+                            <label class="form-check-label" for="toggleHeatmap">
+                                🌡️ Тепловая карта температуры
+                            </label>
+                        </div>
+                        <div class="opacity-control ms-4">
+                            <label for="heatmapOpacity" class="form-label small mb-1">
+                                Прозрачность: <span id="heatmapOpacityValue">60%</span>
+                            </label>
+                            <input type="range" class="form-range" id="heatmapOpacity" 
+                                   min="0" max="1" step="0.1" value="0.6">
+                        </div>
+                    </div>
+                    
+                    <!-- Векторное поле ветра -->
+                    <div class="mb-3 pb-3 border-bottom">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="toggleWind">
+                            <label class="form-check-label" for="toggleWind">
+                                💨 Векторное поле ветра
+                            </label>
+                        </div>
+                        <div class="opacity-control ms-4">
+                            <label for="windOpacity" class="form-label small mb-1">
+                                Прозрачность: <span id="windOpacityValue">80%</span>
+                            </label>
+                            <input type="range" class="form-range" id="windOpacity" 
+                                   min="0" max="1" step="0.1" value="0.8">
+                        </div>
+                    </div>
+                    
+                    <!-- Кнопка сброса вида -->
+                    <button class="btn btn-outline-primary btn-sm w-100" id="resetMapView">
+                        🎯 Сбросить вид карты
+                    </button>
                 </div>
             </div>
             
-            <!-- Weather Layers Control -->
-            <div class="legend mt-3">
-                <h6 class="mb-3">🌤️ Погодные слои</h6>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="toggleHeatmap">
-                    <label class="form-check-label" for="toggleHeatmap">
-                        🌡️ Тепловая карта температуры
-                    </label>
+            <!-- Dynamic Legend -->
+            <div class="card mt-3" id="map-legend">
+                <div class="card-header">
+                    <h6 class="mb-0">📖 Легенда</h6>
                 </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="toggleWindVectors">
-                    <label class="form-check-label" for="toggleWindVectors">
-                        💨 Векторы ветра
-                    </label>
+                <div class="card-body">
+                    <div id="map-legend-content">
+                        <p class="text-muted"><small>Включите слои для отображения легенды</small></p>
+                    </div>
+                    <div id="legend-info"></div>
                 </div>
-                <small class="text-muted d-block mt-2">
-                    <em>Прототип с тестовыми данными</em>
-                </small>
             </div>
         </div>
         
@@ -187,6 +216,18 @@
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='js/i18n/ru.js') }}"></script>
 <script src="{{ url_for('static', filename='js/weatherLayers.js') }}"></script>
+<script src="{{ url_for('static', filename='js/legend.js') }}"></script>
+<script src="{{ url_for('static', filename='js/layersControl.js') }}"></script>
 <script src="{{ url_for('static', filename='js/map.js') }}"></script>
 <script src="{{ url_for('static', filename='js/filters.js') }}"></script>
+<script>
+    // Инициализация после загрузки карты
+    document.addEventListener('DOMContentLoaded', function() {
+        // Даём время карте инициализироваться
+        setTimeout(function() {
+            инициализироватьУправлениеСлоями();
+            инициализироватьЛегенду();
+        }, 500);
+    });
+</script>
 {% endblock %}

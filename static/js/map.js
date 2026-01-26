@@ -117,9 +117,6 @@ function initMap() {
         }
     });
     
-    // Настроить обработчики для переключения погодных слоев
-    setupWeatherLayersControls();
-    
     // Загрузить начальные данные
     loadMeasurements();
     
@@ -150,25 +147,7 @@ function hideLoadingIndicator() {
     }
 }
 
-/**
- * Настроить обработчики для управления погодными слоями
- */
-function setupWeatherLayersControls() {
-    const heatmapCheckbox = document.getElementById('toggleHeatmap');
-    const windCheckbox = document.getElementById('toggleWindVectors');
-    
-    if (heatmapCheckbox) {
-        heatmapCheckbox.addEventListener('change', async function() {
-            await переключитьТепловуюКарту(map, this.checked);
-        });
-    }
-    
-    if (windCheckbox) {
-        windCheckbox.addEventListener('change', async function() {
-            await переключитьВекторыВетра(map, this.checked);
-        });
-    }
-}
+// Функция setupWeatherLayersControls() удалена - логика перенесена в layersControl.js
 
 /**
  * Загрузить измерения из API и отобразить на карте
@@ -329,41 +308,81 @@ function createPopupContent(props) {
     
     // Вычислить процент от нормы
     let percentageInfo = '';
+    let progressBar = '';
     if (props.safe_limit && props.safe_limit > 0) {
         const percentage = ((props.value / props.safe_limit) * 100).toFixed(1);
         const percentageColor = props.is_safe ? '#28a745' : '#dc3545';
+        const progressBarColor = props.is_safe ? 'success' : 'danger';
+        const progressBarWidth = Math.min(percentage, 100);
+        
         percentageInfo = `
-            <p class="mb-1">
+            <p class="mb-2">
                 <small>
                     Процент от нормы: 
                     <strong style="color: ${percentageColor};">${percentage}%</strong>
                 </small>
             </p>
         `;
+        
+        progressBar = `
+            <div class="progress mb-2" style="height: 8px;">
+                <div class="progress-bar bg-${progressBarColor}" 
+                     role="progressbar" 
+                     style="width: ${progressBarWidth}%" 
+                     aria-valuenow="${progressBarWidth}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="100">
+                </div>
+            </div>
+        `;
+    }
+    
+    // Определить уровень качества воздуха
+    let qualityLevel = '';
+    if (props.safe_limit && props.safe_limit > 0) {
+        const ratio = props.value / props.safe_limit;
+        if (ratio <= 0.5) {
+            qualityLevel = '<span class="badge bg-success mb-2">🌟 Отличное качество</span>';
+        } else if (ratio <= 1.0) {
+            qualityLevel = '<span class="badge bg-warning text-dark mb-2">⚠️ Удовлетворительное</span>';
+        } else if (ratio <= 2.0) {
+            qualityLevel = '<span class="badge bg-orange text-white mb-2" style="background-color: #fd7e14;">⚠️ Нездоровое</span>';
+        } else {
+            qualityLevel = '<span class="badge bg-danger mb-2">☠️ Опасное</span>';
+        }
     }
     
     return `
-        <div style="min-width: 250px; max-width: 300px;">
-            <h6 class="mb-2"><strong>📍 ${props.location_name || 'Станция мониторинга'}</strong></h6>
-            ${props.district ? `<p class="mb-2 text-muted"><small>${props.district}</small></p>` : ''}
+        <div style="min-width: 280px; max-width: 320px;">
+            <div class="d-flex align-items-center mb-2">
+                <h6 class="mb-0 flex-grow-1"><strong>📍 ${props.location_name || 'Станция мониторинга'}</strong></h6>
+            </div>
+            ${props.district ? `<p class="mb-2 text-muted"><small>📌 ${props.district}</small></p>` : ''}
+            ${qualityLevel}
             <hr class="my-2">
             <div class="mb-2">
-                <strong>Тип загрязнителя:</strong> ${props.parameter_name}
+                <strong>Параметр:</strong> ${props.parameter_name}
             </div>
             <div class="mb-2">
                 <strong>Значение:</strong> 
-                <span style="font-size: 1.3rem; color: #0066cc;">${props.value} ${props.unit}</span>
+                <span style="font-size: 1.4rem; color: #0066cc; font-weight: 600;">${props.value} ${props.unit}</span>
             </div>
             ${props.safe_limit ? `
                 <div class="mb-1">
-                    <small>Норматив: <strong>${props.safe_limit} ${props.unit}</strong></small>
+                    <small class="text-muted">Норматив: <strong>${props.safe_limit} ${props.unit}</strong></small>
                 </div>
             ` : ''}
+            ${progressBar}
             ${percentageInfo}
             <div class="mb-2">${status}</div>
             <hr class="my-2">
             <div class="text-muted">
-                <small><strong>Время измерения:</strong><br>${formattedDate}</small>
+                <small><strong>⏱️ Время измерения:</strong><br>${formattedDate}</small>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted" style="font-style: italic;">
+                    💡 Нажмите на карту, чтобы закрыть
+                </small>
             </div>
         </div>
     `;

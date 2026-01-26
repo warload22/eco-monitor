@@ -80,6 +80,109 @@ body {
     top: 20px;
 }
 
+/* Layers Control Panel */
+#layers-panel .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+#layers-panel .opacity-control {
+    transition: opacity 0.3s ease;
+}
+
+#layers-panel .form-check-input:not(:checked) ~ .opacity-control {
+    opacity: 0.5;
+}
+
+#layers-panel .form-range {
+    cursor: pointer;
+}
+
+#layers-panel .form-range::-webkit-slider-thumb {
+    background-color: #0d6efd;
+    cursor: pointer;
+}
+
+#layers-panel .form-range::-moz-range-thumb {
+    background-color: #0d6efd;
+    cursor: pointer;
+}
+
+/* Map Legend */
+#map-legend .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.legend-section {
+    padding: 10px 0;
+}
+
+.legend-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #495057;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.875rem;
+}
+
+.legend-marker {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-right: 10px;
+    border: 2px solid #fff;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
+}
+
+.legend-text {
+    color: #495057;
+}
+
+.legend-gradient-container {
+    margin-top: 10px;
+}
+
+.legend-description {
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+
+/* Wind Tooltip */
+.wind-tooltip {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    pointer-events: none;
+    z-index: 1001;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+}
+
+.wind-tooltip .tooltip-content {
+    line-height: 1.4;
+}
+
+/* Reset Map View Button */
+#resetMapView {
+    transition: all 0.2s ease;
+}
+
+#resetMapView:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
 /* Stats cards */
 .stats-card {
     transition: transform 0.2s;

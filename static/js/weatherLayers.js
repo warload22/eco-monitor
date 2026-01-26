@@ -249,6 +249,9 @@ function инициализироватьПогодныеСлои(map) {
     map.addLayer(heatmapLayer);
     map.addLayer(windVectorsLayer);
     
+    // Настроить tooltip для векторов ветра
+    настроитьTooltipВетра(map);
+    
     console.log('Погодные слои инициализированы');
 }
 
@@ -357,4 +360,102 @@ async function обновитьПогодныеСлои(map) {
         await Promise.all(обновления);
         console.log('Погодные слои обновлены');
     }
+}
+
+/**
+ * Настроить tooltip для векторов ветра
+ * Показывает подсказку при наведении на стрелку
+ * @param {ol.Map} map - Экземпляр карты OpenLayers
+ */
+function настроитьTooltipВетра(map) {
+    // Создать элемент tooltip
+    let tooltipElement = document.getElementById('wind-tooltip');
+    
+    if (!tooltipElement) {
+        tooltipElement = document.createElement('div');
+        tooltipElement.id = 'wind-tooltip';
+        tooltipElement.className = 'wind-tooltip';
+        tooltipElement.style.display = 'none';
+        document.body.appendChild(tooltipElement);
+    }
+    
+    // Создать overlay для tooltip
+    const tooltipOverlay = new ol.Overlay({
+        element: tooltipElement,
+        positioning: 'bottom-center',
+        offset: [0, -15],
+        stopEvent: false
+    });
+    
+    map.addOverlay(tooltipOverlay);
+    
+    // Обработчик наведения курсора
+    map.on('pointermove', function(event) {
+        // Проверяем, видим ли слой векторов ветра
+        if (!windVectorsLayer || !windVectorsLayer.getVisible()) {
+            tooltipElement.style.display = 'none';
+            return;
+        }
+        
+        // Проверяем наличие feature в данной точке
+        const feature = map.forEachFeatureAtPixel(event.pixel, function(feature, layer) {
+            // Проверяем, что это feature из слоя ветра
+            if (layer === windVectorsLayer) {
+                return feature;
+            }
+            return null;
+        });
+        
+        if (feature && feature.get('speed') !== undefined) {
+            // Получаем данные о ветре
+            const speed = feature.get('speed');
+            const direction = feature.get('direction');
+            const directionText = получитьНаправлениеВетраТекст(direction);
+            
+            // Обновляем содержимое tooltip
+            tooltipElement.innerHTML = `
+                <div class="tooltip-content">
+                    <strong>💨 Ветер</strong><br>
+                    <small>Скорость: <strong>${speed.toFixed(1)} м/с</strong></small><br>
+                    <small>Направление: <strong>${directionText} (${Math.round(direction)}°)</strong></small>
+                </div>
+            `;
+            
+            // Позиционируем tooltip
+            const coordinates = feature.getGeometry().getCoordinates();
+            tooltipOverlay.setPosition(coordinates);
+            tooltipElement.style.display = 'block';
+        } else {
+            tooltipElement.style.display = 'none';
+        }
+    });
+    
+    console.log('Tooltip для векторов ветра настроен');
+}
+
+/**
+ * Получить текстовое описание направления ветра
+ * @param {number} градусы - Направление в градусах (0-360)
+ * @returns {string} Текстовое описание направления
+ */
+function получитьНаправлениеВетраТекст(градусы) {
+    const направления = [
+        { мин: 0, макс: 22.5, текст: 'Северный' },
+        { мин: 22.5, макс: 67.5, текст: 'Северо-восточный' },
+        { мин: 67.5, макс: 112.5, текст: 'Восточный' },
+        { мин: 112.5, макс: 157.5, текст: 'Юго-восточный' },
+        { мин: 157.5, макс: 202.5, текст: 'Южный' },
+        { мин: 202.5, макс: 247.5, текст: 'Юго-западный' },
+        { мин: 247.5, макс: 292.5, текст: 'Западный' },
+        { мин: 292.5, макс: 337.5, текст: 'Северо-западный' },
+        { мин: 337.5, макс: 360, текст: 'Северный' }
+    ];
+    
+    for (const направление of направления) {
+        if (градусы >= направление.мин && градусы < направление.макс) {
+            return направление.текст;
+        }
+    }
+    
+    return 'Северный';
 }

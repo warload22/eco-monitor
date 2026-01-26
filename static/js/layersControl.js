@@ -1,0 +1,206 @@
+/**
+ * Модуль управления слоями карты
+ * Управляет видимостью и прозрачностью всех слоёв на карте
+ */
+
+// Глобальный объект для отслеживания состояния слоёв
+const activeLayers = {
+    stations: {
+        visible: true,
+        opacity: 1.0,
+        name: 'Станции мониторинга'
+    },
+    heatmap: {
+        visible: false,
+        opacity: 0.6,
+        name: 'Тепловая карта температуры'
+    },
+    wind: {
+        visible: false,
+        opacity: 0.8,
+        name: 'Векторное поле ветра'
+    }
+};
+
+/**
+ * Инициализировать управление слоями
+ * Навешивает обработчики на все чекбоксы и слайдеры
+ */
+function инициализироватьУправлениеСлоями() {
+    console.log('Инициализация управления слоями...');
+    
+    // Чекбокс для станций мониторинга
+    const stationsCheckbox = document.getElementById('toggleStations');
+    if (stationsCheckbox) {
+        stationsCheckbox.checked = activeLayers.stations.visible;
+        stationsCheckbox.addEventListener('change', function() {
+            переключитьСлой('stations', this.checked);
+        });
+    }
+    
+    // Чекбокс для тепловой карты
+    const heatmapCheckbox = document.getElementById('toggleHeatmap');
+    if (heatmapCheckbox) {
+        heatmapCheckbox.checked = activeLayers.heatmap.visible;
+        heatmapCheckbox.addEventListener('change', async function() {
+            await переключитьСлой('heatmap', this.checked);
+        });
+    }
+    
+    // Чекбокс для векторов ветра
+    const windCheckbox = document.getElementById('toggleWind');
+    if (windCheckbox) {
+        windCheckbox.checked = activeLayers.wind.visible;
+        windCheckbox.addEventListener('change', async function() {
+            await переключитьСлой('wind', this.checked);
+        });
+    }
+    
+    // Слайдер прозрачности для тепловой карты
+    const heatmapOpacitySlider = document.getElementById('heatmapOpacity');
+    if (heatmapOpacitySlider) {
+        heatmapOpacitySlider.value = activeLayers.heatmap.opacity;
+        heatmapOpacitySlider.addEventListener('input', function() {
+            изменитьПрозрачность('heatmap', parseFloat(this.value));
+            updateOpacityLabel('heatmapOpacityValue', this.value);
+        });
+        updateOpacityLabel('heatmapOpacityValue', heatmapOpacitySlider.value);
+    }
+    
+    // Слайдер прозрачности для векторов ветра
+    const windOpacitySlider = document.getElementById('windOpacity');
+    if (windOpacitySlider) {
+        windOpacitySlider.value = activeLayers.wind.opacity;
+        windOpacitySlider.addEventListener('input', function() {
+            изменитьПрозрачность('wind', parseFloat(this.value));
+            updateOpacityLabel('windOpacityValue', this.value);
+        });
+        updateOpacityLabel('windOpacityValue', windOpacitySlider.value);
+    }
+    
+    // Кнопка сброса вида
+    const resetViewButton = document.getElementById('resetMapView');
+    if (resetViewButton) {
+        resetViewButton.addEventListener('click', сбросить ВидКарты);
+    }
+    
+    console.log('Управление слоями инициализировано');
+}
+
+/**
+ * Переключить видимость слоя
+ * @param {string} имяСлоя - Название слоя ('stations', 'heatmap', 'wind')
+ * @param {boolean} состояние - Включить (true) или выключить (false)
+ */
+async function переключитьСлой(имяСлоя, состояние) {
+    console.log(`Переключение слоя "${имяСлоя}" в состояние: ${состояние}`);
+    
+    activeLayers[имяСлоя].visible = состояние;
+    
+    switch(имяСлоя) {
+        case 'stations':
+            // Переключить видимость векторного слоя со станциями
+            if (vectorLayer) {
+                vectorLayer.setVisible(состояние);
+            }
+            break;
+            
+        case 'heatmap':
+            // Переключить тепловую карту (используем функцию из weatherLayers.js)
+            if (typeof переключитьТепловуюКарту === 'function' && map) {
+                await переключитьТепловуюКарту(map, состояние);
+            }
+            break;
+            
+        case 'wind':
+            // Переключить векторы ветра (используем функцию из weatherLayers.js)
+            if (typeof переключитьВекторыВетра === 'function' && map) {
+                await переключитьВекторыВетра(map, состояние);
+            }
+            break;
+    }
+    
+    // Обновить легенду
+    if (typeof обновитьЛегенду === 'function') {
+        обновитьЛегенду();
+    }
+}
+
+/**
+ * Изменить прозрачность слоя
+ * @param {string} имяСлоя - Название слоя ('heatmap', 'wind')
+ * @param {number} значение - Значение прозрачности (0.0 - 1.0)
+ */
+function изменитьПрозрачность(имяСлоя, значение) {
+    console.log(`Изменение прозрачности слоя "${имяСлоя}" на ${значение}`);
+    
+    activeLayers[имяСлоя].opacity = значение;
+    
+    switch(имяСлоя) {
+        case 'heatmap':
+            if (heatmapLayer) {
+                heatmapLayer.setOpacity(значение);
+            }
+            break;
+            
+        case 'wind':
+            if (windVectorsLayer) {
+                windVectorsLayer.setOpacity(значение);
+            }
+            break;
+    }
+}
+
+/**
+ * Обновить отображение значения прозрачности рядом со слайдером
+ * @param {string} elementId - ID элемента для отображения значения
+ * @param {number} value - Значение прозрачности
+ */
+function updateOpacityLabel(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = `${Math.round(value * 100)}%`;
+    }
+}
+
+/**
+ * Сбросить вид карты к значениям по умолчанию
+ * Центрирует карту на Москве и устанавливает zoom = 10
+ */
+function сбросить ВидКарты() {
+    if (!map) {
+        console.error('Карта не инициализирована');
+        return;
+    }
+    
+    console.log('Сброс вида карты...');
+    
+    // Координаты Москвы
+    const moscowCoords = [37.6173, 55.7558];
+    const moscowCoordsProjected = ol.proj.fromLonLat(moscowCoords);
+    
+    // Анимированный переход к новому виду
+    map.getView().animate({
+        center: moscowCoordsProjected,
+        zoom: 10,
+        duration: 1000
+    });
+    
+    console.log('Вид карты сброшен');
+}
+
+/**
+ * Получить состояние всех слоёв
+ * @returns {Object} Объект с состоянием слоёв
+ */
+function получитьСостояниеСлоёв() {
+    return { ...activeLayers };
+}
+
+/**
+ * Получить список активных (видимых) слоёв
+ * @returns {Array} Массив названий активных слоёв
+ */
+function получитьАктивныеСлои() {
+    return Object.keys(activeLayers).filter(key => activeLayers[key].visible);
+}
