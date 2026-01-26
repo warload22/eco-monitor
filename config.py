@@ -74,6 +74,20 @@ class Config:
         }
     }
     
+    # Weather Sources Configuration
+    # Конфигурация источников погодных данных
+    WEATHER_CONFIG = {
+        'open_meteo': {
+            'base_url': 'https://api.open-meteo.com/v1/forecast',
+            'latitude': 55.7558,  # Москва
+            'longitude': 37.6176,  # Москва
+            'params': ['temperature_2m', 'relative_humidity_2m', 'wind_speed_10m', 
+                      'wind_direction_10m', 'precipitation', 'surface_pressure'],
+            'timezone': 'Europe/Moscow',
+            'timeout': 30
+        }
+    }
+    
     # Logging configuration for data fetchers
     # Конфигурация логирования сборщиков данных
     FETCHER_LOG_FILE = os.getenv('FETCHER_LOG_FILE', 'logs/fetcher.log')

@@ -618,6 +618,165 @@ https://air-quality-api.open-meteo.com/v1/air-quality?latitude=55.7558&longitude
 
 ---
 
+### Open-Meteo Weather API
+
+**Статус:** ✅ Реализовано
+
+**Описание:** Бесплатный API для получения погодных данных и прогнозов. Не требует ключа API.
+
+**Модуль:** `data_sources/weather/open_meteo_weather_fetcher.py`
+
+**Покрытие:** Москва (55.7558, 37.6176)
+
+**Параметры:**
+- temperature - Температура воздуха (°C)
+- humidity - Относительная влажность (%)
+- wind_speed - Скорость ветра на высоте 10м (м/с)
+- wind_direction - Направление ветра (градусы, 0-360)
+- precipitation - Осадки (мм)
+- pressure - Атмосферное давление на уровне поверхности (гПа)
+
+**Особенности:**
+- API возвращает почасовые данные за несколько дней вперёд
+- Сборщик извлекает последнее доступное значение для каждого параметра
+- Автоматическая нормализация направления ветра (0-360°)
+- Поддержка отрицательных температур (constraint valid_value удалён)
+- Временные метки в часовом поясе Europe/Moscow
+
+**Пример ответа API:**
+
+```json
+{
+  "latitude": 55.75,
+  "longitude": 37.625,
+  "generationtime_ms": 0.895,
+  "utc_offset_seconds": 10800,
+  "timezone": "Europe/Moscow",
+  "hourly": {
+    "time": [
+      "2026-01-26T00:00",
+      "2026-01-26T01:00",
+      "2026-01-26T02:00"
+    ],
+    "temperature_2m": [-24.3, -23.5, -22.8],
+    "relative_humidity_2m": [72, 71, 70],
+    "wind_speed_10m": [6.9, 7.2, 7.5],
+    "wind_direction_10m": [96, 98, 100],
+    "precipitation": [0.0, 0.0, 0.1],
+    "surface_pressure": [1018.2, 1018.5, 1018.8]
+  }
+}
+```
+
+**Логика парсинга:**
+
+```python
+# 1. API возвращает временные ряды (массивы значений по часам)
+hourly_data = response['hourly']
+time_series = hourly_data['temperature_2m']  # [-24.3, -23.5, ...]
+timestamps = hourly_data['time']              # ["2026-01-26T00:00", ...]
+
+# 2. Извлекаем последнее не-null значение
+last_value = None
+last_timestamp = None
+for value, timestamp in reversed(zip(time_series, timestamps)):
+    if value is not None:
+        last_value = value
+        last_timestamp = timestamp
+        break
+
+# 3. Нормализация значений
+if parameter == 'wind_direction_10m':
+    # Направление ветра должно быть 0-360°
+    while last_value < 0:
+        last_value += 360
+    while last_value >= 360:
+        last_value -= 360
+
+# 4. Преобразуем в единый формат
+measurement = {
+    'parameter_name': 'temperature',
+    'category': 'погода',
+    'value': last_value,
+    'unit': '°C',
+    'latitude': 55.7558,
+    'longitude': 37.6176,
+    'timestamp': datetime.fromisoformat(last_timestamp),
+    'external_id': 'open_meteo_moscow_weather'
+}
+```
+
+**Конфигурация:**
+
+В `config.py`:
+
+```python
+WEATHER_CONFIG = {
+    'open_meteo': {
+        'base_url': 'https://api.open-meteo.com/v1/forecast',
+        'latitude': 55.7558,  # Москва
+        'longitude': 37.6176,  # Москва
+        'params': ['temperature_2m', 'relative_humidity_2m', 'wind_speed_10m', 
+                  'wind_direction_10m', 'precipitation', 'surface_pressure'],
+        'timezone': 'Europe/Moscow',
+        'timeout': 30
+    }
+}
+```
+
+**Запуск:**
+
+```bash
+# Напрямую
+python data_sources/weather/open_meteo_weather_fetcher.py
+
+# Через тестовый скрипт
+python test_weather_fetcher.py
+
+# Через общий интерфейс
+python -c "from data_sources import запустить_сборщик; запустить_сборщик('weather')"
+
+# Запуск всех сборщиков (воздух + погода)
+python -c "from data_sources import запустить_все_сборщики; import pprint; pprint.pprint(запустить_все_сборщики())"
+```
+
+**Тестирование:**
+
+```bash
+# Запуск теста с детальным выводом
+python test_weather_fetcher.py
+
+# Проверка данных в БД через PostgreSQL MCP
+# Выполнить запрос:
+SELECT p.name, m.value, p.unit, m.measured_at
+FROM measurements m
+JOIN parameters p ON m.parameter_id = p.id
+WHERE p.category = 'погода'
+ORDER BY m.measured_at DESC
+LIMIT 10;
+
+# Проверка через API
+curl "http://127.0.0.1:5000/api/measurements?category=погода"
+```
+
+**URL для тестирования в браузере:**
+
+```
+https://api.open-meteo.com/v1/forecast?latitude=55.7558&longitude=37.6176&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation,surface_pressure&timezone=Europe/Moscow
+```
+
+**Источники данных:**
+- NOAA GFS (Global Forecast System) - 13 км разрешение
+- ECMWF IFS - 9 км разрешение  
+- DWD ICON - 11 км разрешение
+- Метео-Франс ARPEGE & AROME
+
+**Обновление:** Каждые 6 часов
+
+**Документация:** https://open-meteo.com/en/docs
+
+---
+
 ## Примеры использования
 
 ### Запуск всех сборщиков

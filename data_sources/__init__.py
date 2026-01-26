@@ -23,11 +23,10 @@ def запустить_все_сборщики() -> Dict[str, Any]:
     
     logger.info("Запуск всех сборщиков данных...")
     
-    # Импортируем сборщики
+    # Запускаем сборщик качества воздуха
     try:
         from data_sources.air_quality.open_meteo_fetcher import собрать_данные_о_качестве_воздуха
         
-        # Запускаем сборщик качества воздуха
         logger.info("Запуск сборщика качества воздуха (Open-Meteo)...")
         результаты['open_meteo_air_quality'] = собрать_данные_о_качестве_воздуха()
         
@@ -39,7 +38,20 @@ def запустить_все_сборщики() -> Dict[str, Any]:
             'ошибки': [str(e)]
         }
     
-    # TODO: Добавить другие сборщики (погода и т.д.)
+    # Запускаем сборщик погоды
+    try:
+        from data_sources.weather.open_meteo_weather_fetcher import собрать_погодные_данные
+        
+        logger.info("Запуск сборщика погоды (Open-Meteo)...")
+        результаты['open_meteo_weather'] = собрать_погодные_данные()
+        
+    except Exception as e:
+        logger.error(f"Ошибка при запуске сборщика Open-Meteo Weather: {e}")
+        результаты['open_meteo_weather'] = {
+            'получено': 0,
+            'сохранено': 0,
+            'ошибки': [str(e)]
+        }
     
     logger.info("Все сборщики завершены")
     return результаты
@@ -50,7 +62,7 @@ def запустить_сборщик(имя_модуля: str) -> Dict[str, Any
     Запустить конкретный сборщик данных
     
     Args:
-        имя_модуля: Название модуля ('air_quality', 'weather' и т.д.)
+        имя_модуля: Название модуля ('air_quality', 'weather', 'open_meteo_air', 'open_meteo_weather' и т.д.)
         
     Returns:
         Результат работы сборщика
@@ -67,6 +79,9 @@ def запустить_сборщик(имя_модуля: str) -> Dict[str, Any
         if имя_модуля == 'air_quality' or имя_модуля == 'open_meteo_air':
             from data_sources.air_quality.open_meteo_fetcher import собрать_данные_о_качестве_воздуха
             результат = собрать_данные_о_качестве_воздуха()
+        elif имя_модуля == 'weather' or имя_модуля == 'open_meteo_weather':
+            from data_sources.weather.open_meteo_weather_fetcher import собрать_погодные_данные
+            результат = собрать_погодные_данные()
         else:
             ошибка = f"Неизвестный модуль сборщика: {имя_модуля}"
             logger.error(ошибка)
