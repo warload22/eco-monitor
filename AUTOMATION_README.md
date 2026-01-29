@@ -56,7 +56,7 @@
 1. Выберите "Запустить программу" (Start a program)
 2. В поле "Программа или сценарий":
    ```
-   C:\Users\Admin\.cursor\projects\eco_monitor\.venv\Scripts\python.exe
+   C:\Projects\eco_monitor\.venv\Scripts\python.exe
    ```
 
 3. В поле "Добавить аргументы":
@@ -66,7 +66,7 @@
 
 4. В поле "Рабочая папка":
    ```
-   C:\Users\Admin\.cursor\projects\eco_monitor
+   C:\Projects\eco_monitor
    ```
 
 ### Шаг 5: Дополнительные параметры
@@ -104,7 +104,7 @@
 
 ```batch
 @echo off
-cd /d "C:\Users\Admin\.cursor\projects\eco_monitor"
+cd /d "C:\Projects\eco_monitor"
 call .venv\Scripts\activate
 python data_sources/air_quality/open_meteo_fetcher.py >> logs/open_meteo_scheduler.log 2>&1
 echo ========================= >> logs/open_meteo_scheduler.log
@@ -147,7 +147,7 @@ echo ========================= >> logs/open_meteo_scheduler.log
 Проверяйте логи сборщиков в:
 
 ```
-C:\Users\Admin\.cursor\projects\eco_monitor\logs\
+C:\Projects\eco_monitor\logs\
 ├── fetcher.log              # Общий лог всех сборщиков
 ├── open_meteo_scheduler.log # Лог запусков из планировщика
 └── test_open_meteo.log      # Лог тестовых запусков

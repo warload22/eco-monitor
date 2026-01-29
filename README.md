@@ -58,7 +58,6 @@
 
 **Dev Tools:**
 - Git (версионный контроль)
-- Cursor AI (разработка)
 
 ## Быстрый старт (Getting Started)
 
